@@ -1,11 +1,19 @@
 from rich.table import Table
-
 from decorators import input_error
 from models import AddressBook
+from rich.console import Console
 
+
+console = Console()
+
+def _print(result):
+    if isinstance(result, str) and result.startswith("Error"):
+        console.print(f"[bold red]{result}[/bold red]")
+    else:
+        console.print(result)
 
 @input_error
-def display_all(book: AddressBook):  # show all contacts as table
+def display_all(args, book: AddressBook):  # show all contacts as table
     if not book.data:
         return "No contacts saved."
 
@@ -57,7 +65,7 @@ def display_birthday(args, book: AddressBook):  # show contact birthday as table
 
 
 @input_error
-def display_birthdays(book: AddressBook):  # show upcoming birthdays as table
+def display_birthdays(args, book: AddressBook):  # show upcoming birthdays as table
     upcoming = book.get_upcoming_birthdays()
     if not upcoming:
         return "No birthdays in the next 7 days."
@@ -70,3 +78,23 @@ def display_birthdays(book: AddressBook):  # show upcoming birthdays as table
         table.add_row(entry["name"], entry["congratulation_date"])
 
     return table
+
+def show_help(console):
+    table = Table(title="Available commands", show_header=True, header_style="bold cyan")
+    table.add_column("Command", style="green")
+    table.add_column("Description")
+
+    table.add_row("hello", "Greet the bot")
+    table.add_row("add [name] [phone]", "Add or update a contact")
+    table.add_row("change [name] [old] [new]", "Change phone number")
+    table.add_row("phone [name]", "Show phone number(s)")
+    table.add_row("all", "Show all contacts")
+    table.add_row("delete [name]", "Delete a contact")
+    table.add_row("remove-phone [name] [phone]", "Remove a specific phone")
+    table.add_row("add-birthday [name] [DD.MM.YYYY]", "Add birthday")
+    table.add_row("show-birthday [name]", "Show birthday")
+    table.add_row("birthdays", "Upcoming birthdays (next 7 days)")
+    table.add_row("help", "Show this message")
+    table.add_row("close / exit", "Quit the bot")
+
+    console.print(table)
