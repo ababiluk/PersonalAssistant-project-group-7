@@ -8,8 +8,6 @@ build/
 venv/
 .venv/
 
-# Data
-*.pkl
 
 # OS
 .DS_Store

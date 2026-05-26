@@ -1,3 +1,5 @@
+import random
+
 from rich.table import Table
 from decorators import input_error
 from models import AddressBook
@@ -67,11 +69,12 @@ def display_birthday(args, book: AddressBook):  # show contact birthday as table
 
 @input_error
 def display_birthdays(args, book: AddressBook):  # show upcoming birthdays as table
-    upcoming = book.get_upcoming_birthdays()
+    days = int(args[0]) if args else 7
+    upcoming = book.get_upcoming_birthdays(days=days)
     if not upcoming:
-        return "No birthdays in the next 7 days."
+        return f"No birthdays in the next {days} days."
 
-    table = Table(title="Upcoming Birthdays", header_style="bold cyan")
+    table = Table(title=f"Upcoming Birthdays (next {days} days)", header_style="bold cyan")
     table.add_column("Name", style="green")
     table.add_column("Congratulation Date")
 
@@ -80,8 +83,30 @@ def display_birthdays(args, book: AddressBook):  # show upcoming birthdays as ta
 
     return table
 
+_GREETINGS = [
+    "Hi! How can I help you?",
+    "Hello! What can I do for you?",
+    "Hey there! What do you need?",
+    "Greetings! How may I assist you?",
+    "Hi! Ready to help. What's up?",
+]
+
+_REPEAT_GREETINGS = [
+    "We already said hello, but hi again!",
+    "Again? Well, hello once more!",
+    "You greeted me already, but I don't mind — hello!",
+    "Second hello? Why not — hi!",
+]
+
+_hello_count = 0
+
+
 def hello_message(_args, _book):  # greeting message from the bot
-    return "Hi, how can I help you?"
+    global _hello_count
+    _hello_count += 1
+    if _hello_count > 1:
+        return random.choice(_REPEAT_GREETINGS)
+    return random.choice(_GREETINGS)
 
 
 def show_help(_args, _book):
@@ -90,15 +115,15 @@ def show_help(_args, _book):
     table.add_column("Description")
 
     table.add_row("hello", "Greet the bot")
-    table.add_row("add [name] [phone]", "Add or update a contact")
-    table.add_row("change [name] [old] [new]", "Change phone number")
-    table.add_row("phone [name]", "Show phone number(s)")
+    table.add_row("add \\[name] \\[phone]", "Add or update a contact")
+    table.add_row("change \\[name] \\[old] \\[new]", "Change phone number")
+    table.add_row("phone \\[name]", "Show phone number(s)")
     table.add_row("all", "Show all contacts")
-    table.add_row("delete [name]", "Delete a contact")
-    table.add_row("remove-phone [name] [phone]", "Remove a specific phone")
-    table.add_row("add-birthday [name] [DD.MM.YYYY]", "Add birthday")
-    table.add_row("show-birthday [name]", "Show birthday")
-    table.add_row("birthdays", "Upcoming birthdays (next 7 days)")
+    table.add_row("delete \\[name]", "Delete a contact")
+    table.add_row("remove-phone \\[name] \\[phone]", "Remove a specific phone")
+    table.add_row("add-birthday \\[name] \\[DD.MM.YYYY]", "Add birthday")
+    table.add_row("show-birthday \\[name]", "Show birthday")
+    table.add_row("birthdays \\[days]", "Upcoming birthdays (default: 7 days)")
     table.add_row("help", "Show this message")
     table.add_row("close / exit", "Quit the bot")
 
