@@ -12,6 +12,7 @@ def _print(result):
     else:
         console.print(result)
 
+
 @input_error
 def display_all(args, book: AddressBook):  # show all contacts as table
     if not book.data:
@@ -79,7 +80,11 @@ def display_birthdays(args, book: AddressBook):  # show upcoming birthdays as ta
 
     return table
 
-def show_help(console):
+def hello_message(_args, _book):  # greeting message from the bot
+    return "Hi, how can I help you?"
+
+
+def show_help(_args, _book):
     table = Table(title="Available commands", show_header=True, header_style="bold cyan")
     table.add_column("Command", style="green")
     table.add_column("Description")

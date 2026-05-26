@@ -9,14 +9,16 @@ from handlers.birthday_handlers import (
     add_birthday,
 )
 from handlers.display import (
-    display_all, 
-    display_phone, 
-    display_birthday, 
+    display_all,
+    display_phone,
+    display_birthday,
     display_birthdays,
-    show_help
+    show_help,
+    hello_message,
 )
 
 commands = {
+    "hello": hello_message,
     "help": show_help,
     "add": add_contact,
     "change": change_contact,
