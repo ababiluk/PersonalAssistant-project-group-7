@@ -94,3 +94,24 @@ def remove_phone(args, book: AddressBook):  # remove specific phone from contact
         raise KeyError(name)
     record.remove_phone(phone)
     return "Phone removed."
+
+
+@input_error
+def find_contact(args, book: AddressBook):
+    search_query = args[0].lower()
+    found_records = []
+    
+    for record in book.data.values():
+        if search_query in record.name.value.lower():
+            found_records.append(str(record))
+            continue
+            
+        for phone in record.phones:
+            if search_query in phone.value:
+                found_records.append(str(record))
+                break
+                
+    if not found_records:
+        return "No contacts found."
+        
+    return "\n".join(found_records)
