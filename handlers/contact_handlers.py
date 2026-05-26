@@ -1,6 +1,6 @@
 from decorators import input_error
 from models import AddressBook, Record
-
+from rich.table import Table
 
 def _validate_name(name):  # validation of name
     if not name.isalpha():
@@ -103,15 +103,25 @@ def find_contact(args, book: AddressBook):
     
     for record in book.data.values():
         if search_query in record.name.value.lower():
-            found_records.append(str(record))
+            found_records.append(record)
             continue
             
         for phone in record.phones:
             if search_query in phone.value:
-                found_records.append(str(record))
+                found_records.append(record)
                 break
                 
     if not found_records:
         return "No contacts found."
         
-    return "\n".join(found_records)
+    table = Table(title=f"Search Results for '{args[0]}'", header_style="bold cyan")
+    table.add_column("Name", style="green")
+    table.add_column("Phones")
+    table.add_column("Birthday")
+    
+    for record in found_records:
+        phones = "; ".join(p.value for p in record.phones) or "—"
+        birthday = str(record.birthday) if record.birthday else "—"
+        table.add_row(record.name.value, phones, birthday)
+        
+    return table
