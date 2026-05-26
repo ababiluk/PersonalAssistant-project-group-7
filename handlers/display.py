@@ -124,6 +124,7 @@ def show_help(_args, _book):
     table.add_row("add-birthday \\[name] \\[DD.MM.YYYY]", "Add birthday")
     table.add_row("show-birthday \\[name]", "Show birthday")
     table.add_row("birthdays \\[days]", "Upcoming birthdays (default: 7 days)")
+    table.add_row("find \\[query]", "Search contacts by name or phone")
     table.add_row("help", "Show this message")
     table.add_row("close / exit", "Quit the bot")
 
