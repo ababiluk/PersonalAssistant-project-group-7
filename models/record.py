@@ -1,4 +1,4 @@
-from .fields import Name, Phone, Birthday
+from .fields import Name, Phone, Birthday, Email
 
 
 class Record:
@@ -6,6 +6,7 @@ class Record:
         self.name = Name(name)
         self.phones = []
         self.birthday = None
+        self.email = None
 
     def add_phone(self, phone):
         self.phones.append(Phone(phone))
@@ -28,7 +29,11 @@ class Record:
     def add_birthday(self, birthday):
         self.birthday = Birthday(birthday)
 
+    def add_email(self, email):
+        self.email = Email(email)  # Функція для додавання пошти
+
     def __str__(self):
         birthday = str(self.birthday) if self.birthday else "N/A"
+        email = str(self.email) if self.email else "N/A"
         phones = "; ".join(p.value for p in self.phones)
-        return f"Contact name: {self.name.value}, phones: {phones}, birthday: {birthday}"
+        return f"Contact name: {self.name.value}, phones: {phones}, email: {email}, birthday: {birthday}"

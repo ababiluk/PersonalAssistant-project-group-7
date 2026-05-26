@@ -4,6 +4,7 @@ from handlers.contact_handlers import (
     delete_contact,
     remove_phone,
     find_contact,
+    add_email,
 )
 from handlers.birthday_handlers import (
     add_birthday,
@@ -30,4 +31,5 @@ commands = {
     "show-birthday": display_birthday,
     "birthdays": display_birthdays,
     "find": find_contact,
+    "add-email": add_email,
 }

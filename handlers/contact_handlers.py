@@ -2,6 +2,7 @@ from decorators import input_error
 from models import AddressBook, Record
 from rich.table import Table
 
+
 def _validate_name(name):  # validation of name
     if not name.isalpha():
         return "Error: name must contain only letters."
@@ -97,7 +98,17 @@ def remove_phone(args, book: AddressBook):  # remove specific phone from contact
 
 
 @input_error
-def find_contact(args, book: AddressBook):
+def add_email(args, book: AddressBook):  # adding email to existing contact
+    name, email = args
+    record = book.find(name)
+    if not record:
+        raise KeyError(name)
+    record.add_email(email)
+    return "Email added."
+
+
+@input_error
+def find_contact(args, book: AddressBook):  # finding contact by name or phone
     search_query = args[0].lower()
     found_records = []
     
@@ -117,11 +128,13 @@ def find_contact(args, book: AddressBook):
     table = Table(title=f"Search Results for '{args[0]}'", header_style="bold cyan")
     table.add_column("Name", style="green")
     table.add_column("Phones")
+    table.add_column("Email")
     table.add_column("Birthday")
     
     for record in found_records:
         phones = "; ".join(p.value for p in record.phones) or "—"
+        email = str(record.email) if record.email else "—"
         birthday = str(record.birthday) if record.birthday else "—"
-        table.add_row(record.name.value, phones, birthday)
+        table.add_row(record.name.value, phones, email, birthday)
         
     return table
