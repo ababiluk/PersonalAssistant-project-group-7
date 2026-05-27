@@ -38,3 +38,11 @@ class Email(Field):
         if not re.match(pattern, value):
             raise ValueError("Invalid email format. Example: user@example.com")
         super().__init__(value)
+
+
+class Note(Field):
+    def __init__(self, value, note_id):
+        if not value.strip():
+            raise ValueError("Note cannot be empty.")
+        super().__init__(value.strip())
+        self.id = note_id

@@ -23,12 +23,14 @@ def display_all(args, book: AddressBook):  # show all contacts as table
     table = Table(title="Address Book", header_style="bold cyan")
     table.add_column("Name", style="green")
     table.add_column("Phones")
+    table.add_column("Email")
     table.add_column("Birthday")
 
     for record in book.data.values():
         phones = "; ".join(p.value for p in record.phones) or "—"
+        email = str(record.email) if record.email else "—"
         birthday = str(record.birthday) if record.birthday else "—"
-        table.add_row(record.name.value, phones, birthday)
+        table.add_row(record.name.value, phones, email, birthday)
 
     return table
 
@@ -119,12 +121,20 @@ def show_help(_args, _book):
     table.add_row("change \\[name] \\[old] \\[new]", "Change phone number")
     table.add_row("phone \\[name]", "Show phone number(s)")
     table.add_row("all", "Show all contacts")
-    table.add_row("delete \\[name]", "Delete a contact")
-    table.add_row("remove-phone \\[name] \\[phone]", "Remove a specific phone")
+    table.add_row("delete-contact \\[name]", "Delete a contact")
+    table.add_row("delete-phone \\[name] \\[phone]", "Remove a specific phone")
+    table.add_row("add-email \\[name] \\[email]", "Add email to a contact")
     table.add_row("add-birthday \\[name] \\[DD.MM.YYYY]", "Add birthday")
     table.add_row("show-birthday \\[name]", "Show birthday")
     table.add_row("birthdays \\[days]", "Upcoming birthdays (default: 7 days)")
     table.add_row("find \\[query]", "Search contacts by name or phone")
+    table.add_row("add-note \\[name] \\[text]", "Add a note to a contact")
+    table.add_row("edit-note \\[name] \\[#] \\[new text]", "Edit a note by index")
+    table.add_row("delete-note \\[name] \\[#]", "Delete a note by index")
+    table.add_row("show-notes \\[name]", "Show all notes for a contact")
+    table.add_row("show-all-notes", "Show all notes across all contacts")
+    table.add_row("all-with-notes", "Show all contacts with all fields including notes")
+    table.add_row("find-notes \\[query]", "Search notes across all contacts")
     table.add_row("help", "Show this message")
     table.add_row("close / exit", "Quit the bot")
 

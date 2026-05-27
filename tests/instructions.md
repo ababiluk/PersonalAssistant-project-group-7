@@ -60,6 +60,7 @@ python -m pytest tests/ --lf
 | `tests/test_models.py` | `Phone`, `Birthday`, `Record`, `AddressBook` |
 | `tests/test_handlers.py` | All command handlers + `parse_input`, `save_data`, `load_data` |
 | `tests/test_validation.py` | Input validation edge cases for each field |
+| `tests/test_notes.py` | `Note` field, `Record` note methods, all note handlers |
 
 ---
 
