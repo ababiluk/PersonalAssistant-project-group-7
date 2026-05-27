@@ -5,8 +5,8 @@ from decorators import input_error
 from models import AddressBook
 from rich.console import Console
 
-
 console = Console()
+
 
 def _print(result):
     if isinstance(result, str) and result.startswith("Error"):
@@ -28,7 +28,7 @@ def display_all(args, book: AddressBook):  # show all contacts as table
     table.add_column("Address")
 
     for record in book.data.values():
-        phones = "; ".join(p.value for p in record.phones) or "—"
+        phones = "; ".join(str(p) for p in record.phones) or "—"
         birthday = str(record.birthday) if record.birthday else "—"
         email = str(record.email) if record.email else "—"
         address = str(record.address) if record.address else "—"
@@ -39,7 +39,7 @@ def display_all(args, book: AddressBook):  # show all contacts as table
 
 @input_error
 def display_phone(args, book: AddressBook):  # show contact phones as table
-    name = args[0]
+    name = " ".join(args)
     record = book.find(name)
     if not record:
         raise KeyError(name)
@@ -48,7 +48,7 @@ def display_phone(args, book: AddressBook):  # show contact phones as table
     table.add_column("Name", style="green")
     table.add_column("Phones")
 
-    phones = "; ".join(p.value for p in record.phones) or "—"
+    phones = "; ".join(str(p) for p in record.phones) or "—"
     table.add_row(name, phones)
 
     return table
@@ -78,7 +78,9 @@ def display_birthdays(args, book: AddressBook):  # show upcoming birthdays as ta
     if not upcoming:
         return f"No birthdays in the next {days} days."
 
-    table = Table(title=f"Upcoming Birthdays (next {days} days)", header_style="bold cyan")
+    table = Table(
+        title=f"Upcoming Birthdays (next {days} days)", header_style="bold cyan"
+    )
     table.add_column("Name", style="green")
     table.add_column("Congratulation Date")
 
@@ -86,6 +88,7 @@ def display_birthdays(args, book: AddressBook):  # show upcoming birthdays as ta
         table.add_row(entry["name"], entry["congratulation_date"])
 
     return table
+
 
 _GREETINGS = [
     "Hi! How can I help you?",
@@ -114,7 +117,9 @@ def hello_message(_args, _book):  # greeting message from the bot
 
 
 def show_help(_args, _book):
-    table = Table(title="Available commands", show_header=True, header_style="bold cyan")
+    table = Table(
+        title="Available commands", show_header=True, header_style="bold cyan"
+    )
     table.add_column("Command", style="green")
     table.add_column("Description")
 
