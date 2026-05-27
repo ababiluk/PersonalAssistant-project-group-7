@@ -38,7 +38,9 @@ class Email(Field):
         if not re.match(pattern, value):
             raise ValueError("Invalid email format. Example: user@example.com")
         super().__init__(value)
-
+        
+class Address(Field):
+    pass
 
 class Note(Field):
     def __init__(self, value, note_id):

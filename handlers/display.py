@@ -23,14 +23,16 @@ def display_all(args, book: AddressBook):  # show all contacts as table
     table = Table(title="Address Book", header_style="bold cyan")
     table.add_column("Name", style="green")
     table.add_column("Phones")
-    table.add_column("Email")
     table.add_column("Birthday")
+    table.add_column("Email")
+    table.add_column("Address")
 
     for record in book.data.values():
         phones = "; ".join(p.value for p in record.phones) or "—"
-        email = str(record.email) if record.email else "—"
         birthday = str(record.birthday) if record.birthday else "—"
-        table.add_row(record.name.value, phones, email, birthday)
+        email = str(record.email) if record.email else "—"
+        address = str(record.address) if record.address else "—"
+        table.add_row(record.name.value, phones, birthday, email, address)
 
     return table
 
@@ -138,4 +140,4 @@ def show_help(_args, _book):
     table.add_row("help", "Show this message")
     table.add_row("close / exit", "Quit the bot")
 
-    console.print(table)
+    return table

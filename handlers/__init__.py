@@ -9,4 +9,4 @@ from .contact_handlers import (
     find_contact,
 )
 from .birthday_handlers import add_birthday, show_birthday, birthdays
-from .display import display_all, display_phone, display_birthday, display_birthdays
+from .display import display_all, display_phone, display_birthday, display_birthdays, show_help
