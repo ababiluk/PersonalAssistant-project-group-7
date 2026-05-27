@@ -7,6 +7,7 @@ class Record:
         self.phones = []
         self.birthday = None
         self.email = None
+        self.address = None
         self.notes = []
 
     def add_phone(self, phone):
@@ -14,6 +15,7 @@ class Record:
     
     def add_email(self, email):
         self.email = Email(email)
+        
     def add_address(self, address):
         self.address = Address(address)
 
@@ -34,9 +36,6 @@ class Record:
 
     def add_birthday(self, birthday):
         self.birthday = Birthday(birthday)
-
-    def add_email(self, email):
-        self.email = Email(email)  # Функція для додавання пошти
 
     def add_note(self, text, note_id):
         self.notes.append(Note(text, note_id))
