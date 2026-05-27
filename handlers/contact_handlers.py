@@ -1,19 +1,17 @@
 from decorators import input_error
 from models import AddressBook, Phone, Record, Email, Birthday
 from rich.table import Table
+import re
 
 
 def _validate_name(name):
     parts = name.split()
-    if len(parts) == 0:
+    if not parts:
         return "Error: Name is required."
 
     for part in parts:
         if not part.isalpha():
             return f"Error: '{part}' must contain only letters."
-        if not part.istitle():
-            return "Error: Name parts must start with a capital letter."
-
     return None
 
 
@@ -189,11 +187,12 @@ def change_contact(args, book: AddressBook):  # changing existing contact
 
 @input_error
 def show_phone(args, book: AddressBook):  # showing existing contact phones
-    name = args[0]
+    
+    name = " ".join(args)
     record = book.find(name)
     if not record:
         raise KeyError(name)
-    return "; ".join(p.value for p in record.phones)
+    return "; ".join(str(p).value for p in record.phones)
 
 
 @input_error
@@ -215,11 +214,15 @@ def delete_contact(args, book: AddressBook):  # delete contact from address book
 
 @input_error
 def remove_phone(args, book: AddressBook):  # remove specific phone from contact
-    name, phone = args
+    if len(args) < 2:
+        return "Error: Please provide both name and phone."
+    phone = args[-1]
+    name = " ".join(args[:-1])
+    phone_to_delete = re.sub(r"\D", "", phone)[-10:]
     record = book.find(name)
     if not record:
         raise KeyError(name)
-    record.remove_phone(phone)
+    record.remove_phone(phone_to_delete)
     return "Phone removed."
 
 
@@ -256,11 +259,13 @@ def find_contact(args, book: AddressBook):  # finding contact by name or phone
     table.add_column("Phones")
     table.add_column("Email")
     table.add_column("Birthday")
+    table.add_column("Address")
     
     for record in found_records:
         phones = "; ".join(p.value for p in record.phones) or "—"
         email = str(record.email) if record.email else "—"
         birthday = str(record.birthday) if record.birthday else "—"
-        table.add_row(record.name.value, phones, email, birthday)
+        address = str(record.address) if record.address else "—"
+        table.add_row(record.name.value, phones, email, birthday,address)
         
     return table
