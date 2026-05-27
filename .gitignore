@@ -14,3 +14,5 @@ Thumbs.db
 
 # Claude
 .claude/
+*.pkl
+tests/logs/*.log
