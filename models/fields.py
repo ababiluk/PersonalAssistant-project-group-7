@@ -1,3 +1,4 @@
+import re
 from datetime import datetime
 
 
@@ -29,3 +30,12 @@ class Birthday(Field):
 
     def __str__(self):
         return self.value.strftime("%d.%m.%Y")
+
+class Email(Field):
+    def __init__(self, value):
+        if not re.fullmatch(r"[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}", value):
+            raise ValueError(f"Invalid email format: {value}")
+        super().__init__(value)
+
+class Address(Field):
+    pass
