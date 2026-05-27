@@ -8,9 +8,6 @@ build/
 venv/
 .venv/
 
-# Testing
-tests/
-
 # OS
 .DS_Store
 Thumbs.db
