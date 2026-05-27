@@ -1,4 +1,4 @@
-from .fields import Name, Phone, Birthday, Email
+from .fields import Name, Phone, Birthday, Email, Note
 
 
 class Record:
@@ -7,6 +7,7 @@ class Record:
         self.phones = []
         self.birthday = None
         self.email = None
+        self.notes = []
 
     def add_phone(self, phone):
         self.phones.append(Phone(phone))
@@ -31,6 +32,23 @@ class Record:
 
     def add_email(self, email):
         self.email = Email(email)  # Функція для додавання пошти
+
+    def add_note(self, text, note_id):
+        self.notes.append(Note(text, note_id))
+
+    def edit_note(self, note_id, new_text):
+        for i, note in enumerate(self.notes):
+            if note.id == note_id:
+                self.notes[i] = Note(new_text, note_id)
+                return
+        raise IndexError(f"Note with id {note_id} not found.")
+
+    def delete_note(self, note_id):
+        for i, note in enumerate(self.notes):
+            if note.id == note_id:
+                self.notes.pop(i)
+                return
+        raise IndexError(f"Note with id {note_id} not found.")
 
     def __str__(self):
         birthday = str(self.birthday) if self.birthday else "N/A"

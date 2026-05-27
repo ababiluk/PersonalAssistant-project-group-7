@@ -1,0 +1,315 @@
+Test run: 2026-05-27 12:45:50
+================================================================================
+
+============================= test session starts =============================
+platform win32 -- Python 3.14.3, pytest-9.0.3, pluggy-1.6.0 -- C:\Users\konst\AppData\Local\Python\pythoncore-3.14-64\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\konst\OneDrive\Documents\GitHub\PersonalAssistant-project-group-7
+collecting ... collected 164 items
+
+tests/test_handlers.py::test_add_contact_new PASSED                      [  0%]
+tests/test_handlers.py::test_add_contact_invalid_name PASSED             [  1%]
+tests/test_handlers.py::test_add_contact_name_with_space FAILED          [  1%]
+tests/test_handlers.py::test_add_contact_invalid_phone PASSED            [  2%]
+tests/test_handlers.py::test_add_contact_missing_args PASSED             [  3%]
+tests/test_handlers.py::test_add_contact_no_args PASSED                  [  3%]
+tests/test_handlers.py::test_add_contact_existing_add_phone PASSED       [  4%]
+tests/test_handlers.py::test_add_contact_existing_replace_phone PASSED   [  4%]
+tests/test_handlers.py::test_add_contact_existing_replace_invalid_index PASSED [  5%]
+tests/test_handlers.py::test_add_contact_existing_replace_out_of_range PASSED [  6%]
+tests/test_handlers.py::test_add_contact_existing_no_phones_choice2 PASSED [  6%]
+tests/test_handlers.py::test_add_contact_existing_cancel PASSED          [  7%]
+tests/test_handlers.py::test_change_contact PASSED                       [  7%]
+tests/test_handlers.py::test_change_contact_not_found PASSED             [  8%]
+tests/test_handlers.py::test_change_contact_wrong_old_phone PASSED       [  9%]
+tests/test_handlers.py::test_change_contact_missing_args PASSED          [  9%]
+tests/test_handlers.py::test_change_contact_new_phone_invalid PASSED     [ 10%]
+tests/test_handlers.py::test_delete_contact PASSED                       [ 10%]
+tests/test_handlers.py::test_delete_contact_not_found PASSED             [ 11%]
+tests/test_handlers.py::test_delete_contact_missing_args PASSED          [ 12%]
+tests/test_handlers.py::test_remove_phone PASSED                         [ 12%]
+tests/test_handlers.py::test_remove_phone_contact_not_found PASSED       [ 13%]
+tests/test_handlers.py::test_remove_phone_wrong_number PASSED            [ 14%]
+tests/test_handlers.py::test_remove_phone_missing_args PASSED            [ 14%]
+tests/test_handlers.py::test_add_birthday PASSED                         [ 15%]
+tests/test_handlers.py::test_add_birthday_invalid_format PASSED          [ 15%]
+tests/test_handlers.py::test_add_birthday_impossible_date PASSED         [ 16%]
+tests/test_handlers.py::test_add_birthday_contact_not_found PASSED       [ 17%]
+tests/test_handlers.py::test_add_birthday_missing_args PASSED            [ 17%]
+tests/test_handlers.py::test_add_birthday_overwrites_existing PASSED     [ 18%]
+tests/test_handlers.py::test_show_birthday PASSED                        [ 18%]
+tests/test_handlers.py::test_show_birthday_not_set PASSED                [ 19%]
+tests/test_handlers.py::test_show_birthday_contact_not_found PASSED      [ 20%]
+tests/test_handlers.py::test_show_birthday_missing_args PASSED           [ 20%]
+tests/test_handlers.py::test_birthdays_no_upcoming FAILED                [ 21%]
+tests/test_handlers.py::test_birthdays_with_upcoming FAILED              [ 21%]
+tests/test_handlers.py::test_parse_input_simple PASSED                   [ 22%]
+tests/test_handlers.py::test_parse_input_with_args PASSED                [ 23%]
+tests/test_handlers.py::test_parse_input_uppercase_normalized PASSED     [ 23%]
+tests/test_handlers.py::test_parse_input_extra_spaces PASSED             [ 24%]
+tests/test_handlers.py::test_save_and_load_data PASSED                   [ 25%]
+tests/test_handlers.py::test_load_data_file_not_found PASSED             [ 25%]
+tests/test_handlers.py::test_save_and_load_preserves_birthday PASSED     [ 26%]
+tests/test_models.py::test_phone_valid PASSED                            [ 26%]
+tests/test_models.py::test_phone_too_short PASSED                        [ 27%]
+tests/test_models.py::test_phone_too_long PASSED                         [ 28%]
+tests/test_models.py::test_phone_non_digits PASSED                       [ 28%]
+tests/test_models.py::test_phone_empty PASSED                            [ 29%]
+tests/test_models.py::test_birthday_valid PASSED                         [ 29%]
+tests/test_models.py::test_birthday_invalid_format PASSED                [ 30%]
+tests/test_models.py::test_birthday_str PASSED                           [ 31%]
+tests/test_models.py::test_birthday_impossible_date FAILED               [ 31%]
+tests/test_models.py::test_record_add_phone PASSED                       [ 32%]
+tests/test_models.py::test_record_add_multiple_phones PASSED             [ 32%]
+tests/test_models.py::test_record_remove_phone PASSED                    [ 33%]
+tests/test_models.py::test_record_remove_nonexistent_phone PASSED        [ 34%]
+tests/test_models.py::test_record_edit_phone PASSED                      [ 34%]
+tests/test_models.py::test_record_edit_nonexistent_phone PASSED          [ 35%]
+tests/test_models.py::test_record_find_phone_not_found PASSED            [ 35%]
+tests/test_models.py::test_record_add_birthday PASSED                    [ 36%]
+tests/test_models.py::test_record_str_no_birthday PASSED                 [ 37%]
+tests/test_models.py::test_record_str_with_birthday PASSED               [ 37%]
+tests/test_models.py::test_record_str_multiple_phones PASSED             [ 38%]
+tests/test_models.py::test_record_str_no_phones FAILED                   [ 39%]
+tests/test_models.py::test_address_book_add_and_find PASSED              [ 39%]
+tests/test_models.py::test_address_book_find_missing PASSED              [ 40%]
+tests/test_models.py::test_address_book_delete PASSED                    [ 40%]
+tests/test_models.py::test_address_book_delete_missing PASSED            [ 41%]
+tests/test_models.py::test_address_book_multiple_records PASSED          [ 42%]
+tests/test_models.py::test_upcoming_birthdays_within_window PASSED       [ 42%]
+tests/test_models.py::test_upcoming_birthdays_outside_window PASSED      [ 43%]
+tests/test_models.py::test_upcoming_birthdays_today PASSED               [ 43%]
+tests/test_models.py::test_upcoming_birthdays_no_birthday PASSED         [ 44%]
+tests/test_models.py::test_upcoming_birthdays_custom_days PASSED         [ 45%]
+tests/test_models.py::test_upcoming_birthdays_saturday_to_monday PASSED  [ 45%]
+tests/test_models.py::test_upcoming_birthdays_sunday_to_monday PASSED    [ 46%]
+tests/test_models.py::test_upcoming_birthdays_multiple_contacts PASSED   [ 46%]
+tests/test_notes.py::test_note_valid PASSED                              [ 47%]
+tests/test_notes.py::test_note_stripped PASSED                           [ 48%]
+tests/test_notes.py::test_note_empty_raises PASSED                       [ 48%]
+tests/test_notes.py::test_note_whitespace_only_raises PASSED             [ 49%]
+tests/test_notes.py::test_note_str PASSED                                [ 50%]
+tests/test_notes.py::test_record_add_note PASSED                         [ 50%]
+tests/test_notes.py::test_record_add_multiple_notes PASSED               [ 51%]
+tests/test_notes.py::test_record_add_note_empty_raises PASSED            [ 51%]
+tests/test_notes.py::test_record_edit_note PASSED                        [ 52%]
+tests/test_notes.py::test_record_edit_note_index_zero_raises PASSED      [ 53%]
+tests/test_notes.py::test_record_edit_note_index_too_high_raises PASSED  [ 53%]
+tests/test_notes.py::test_record_edit_note_empty_text_raises PASSED      [ 54%]
+tests/test_notes.py::test_record_delete_note PASSED                      [ 54%]
+tests/test_notes.py::test_record_delete_note_last PASSED                 [ 55%]
+tests/test_notes.py::test_record_delete_note_index_zero_raises PASSED    [ 56%]
+tests/test_notes.py::test_record_delete_note_index_too_high_raises PASSED [ 56%]
+tests/test_notes.py::test_record_delete_note_reindexes PASSED            [ 57%]
+tests/test_notes.py::test_add_note_success PASSED                        [ 57%]
+tests/test_notes.py::test_add_note_single_word PASSED                    [ 58%]
+tests/test_notes.py::test_add_note_contact_not_found PASSED              [ 59%]
+tests/test_notes.py::test_add_note_missing_text PASSED                   [ 59%]
+tests/test_notes.py::test_add_note_no_args PASSED                        [ 60%]
+tests/test_notes.py::test_add_note_empty_text PASSED                     [ 60%]
+tests/test_notes.py::test_add_note_multiple_times PASSED                 [ 61%]
+tests/test_notes.py::test_edit_note_success PASSED                       [ 62%]
+tests/test_notes.py::test_edit_note_contact_not_found PASSED             [ 62%]
+tests/test_notes.py::test_edit_note_non_numeric_index PASSED             [ 63%]
+tests/test_notes.py::test_edit_note_index_out_of_range PASSED            [ 64%]
+tests/test_notes.py::test_edit_note_index_zero PASSED                    [ 64%]
+tests/test_notes.py::test_edit_note_missing_args PASSED                  [ 65%]
+tests/test_notes.py::test_edit_note_empty_new_text PASSED                [ 65%]
+tests/test_notes.py::test_delete_note_success PASSED                     [ 66%]
+tests/test_notes.py::test_delete_note_contact_not_found PASSED           [ 67%]
+tests/test_notes.py::test_delete_note_non_numeric_index PASSED           [ 67%]
+tests/test_notes.py::test_delete_note_index_out_of_range PASSED          [ 68%]
+tests/test_notes.py::test_delete_note_missing_args PASSED                [ 68%]
+tests/test_notes.py::test_delete_note_no_args PASSED                     [ 69%]
+tests/test_notes.py::test_show_notes_returns_table PASSED                [ 70%]
+tests/test_notes.py::test_show_notes_no_notes PASSED                     [ 70%]
+tests/test_notes.py::test_show_notes_contact_not_found PASSED            [ 71%]
+tests/test_notes.py::test_show_notes_no_args PASSED                      [ 71%]
+tests/test_notes.py::test_find_notes_match PASSED                        [ 72%]
+tests/test_notes.py::test_find_notes_no_match PASSED                     [ 73%]
+tests/test_notes.py::test_find_notes_case_insensitive PASSED             [ 73%]
+tests/test_notes.py::test_find_notes_multiword_query PASSED              [ 74%]
+tests/test_notes.py::test_find_notes_partial_match PASSED                [ 75%]
+tests/test_notes.py::test_find_notes_multiple_contacts PASSED            [ 75%]
+tests/test_notes.py::test_find_notes_empty_book PASSED                   [ 76%]
+tests/test_notes.py::test_find_notes_no_args PASSED                      [ 76%]
+tests/test_validation.py::TestPhoneValidation::test_valid PASSED         [ 77%]
+tests/test_validation.py::TestPhoneValidation::test_exactly_10_zeros PASSED [ 78%]
+tests/test_validation.py::TestPhoneValidation::test_empty PASSED         [ 78%]
+tests/test_validation.py::TestPhoneValidation::test_too_short_9 PASSED   [ 79%]
+tests/test_validation.py::TestPhoneValidation::test_too_long_11 PASSED   [ 79%]
+tests/test_validation.py::TestPhoneValidation::test_single_digit PASSED  [ 80%]
+tests/test_validation.py::TestPhoneValidation::test_letters_only PASSED  [ 81%]
+tests/test_validation.py::TestPhoneValidation::test_mixed_digits_letters PASSED [ 81%]
+tests/test_validation.py::TestPhoneValidation::test_with_spaces PASSED   [ 82%]
+tests/test_validation.py::TestPhoneValidation::test_with_dashes PASSED   [ 82%]
+tests/test_validation.py::TestPhoneValidation::test_with_plus PASSED     [ 83%]
+tests/test_validation.py::TestPhoneValidation::test_with_parentheses PASSED [ 84%]
+tests/test_validation.py::TestPhoneValidation::test_with_dots PASSED     [ 84%]
+tests/test_validation.py::TestPhoneValidation::test_special_chars PASSED [ 85%]
+tests/test_validation.py::TestPhoneValidation::test_newline PASSED       [ 85%]
+tests/test_validation.py::TestPhoneValidation::test_tab PASSED           [ 86%]
+tests/test_validation.py::TestPhoneValidation::test_unicode_digits FAILED [ 87%]
+tests/test_validation.py::TestBirthdayValidation::test_valid PASSED      [ 87%]
+tests/test_validation.py::TestBirthdayValidation::test_leap_year_valid PASSED [ 88%]
+tests/test_validation.py::TestBirthdayValidation::test_first_day_of_year PASSED [ 89%]
+tests/test_validation.py::TestBirthdayValidation::test_last_day_of_year PASSED [ 89%]
+tests/test_validation.py::TestBirthdayValidation::test_iso_format PASSED [ 90%]
+tests/test_validation.py::TestBirthdayValidation::test_slash_separator PASSED [ 90%]
+tests/test_validation.py::TestBirthdayValidation::test_space_separator PASSED [ 91%]
+tests/test_validation.py::TestBirthdayValidation::test_no_separator PASSED [ 92%]
+tests/test_validation.py::TestBirthdayValidation::test_year_first PASSED [ 92%]
+tests/test_validation.py::TestBirthdayValidation::test_february_30 PASSED [ 93%]
+tests/test_validation.py::TestBirthdayValidation::test_february_29_non_leap PASSED [ 93%]
+tests/test_validation.py::TestBirthdayValidation::test_april_31 PASSED   [ 94%]
+tests/test_validation.py::TestBirthdayValidation::test_month_0 PASSED    [ 95%]
+tests/test_validation.py::TestBirthdayValidation::test_month_13 PASSED   [ 95%]
+tests/test_validation.py::TestBirthdayValidation::test_day_0 PASSED      [ 96%]
+tests/test_validation.py::TestBirthdayValidation::test_day_32 PASSED     [ 96%]
+tests/test_validation.py::TestBirthdayValidation::test_empty PASSED      [ 97%]
+tests/test_validation.py::TestBirthdayValidation::test_letters PASSED    [ 98%]
+tests/test_validation.py::TestBirthdayValidation::test_partial_date PASSED [ 98%]
+tests/test_validation.py::TestBirthdayValidation::test_extra_parts PASSED [ 99%]
+tests/test_validation.py::TestBirthdayValidation::test_no_leading_zero FAILED [100%]
+
+================================== FAILURES ===================================
+______________________ test_add_contact_name_with_space _______________________
+
+    def test_add_contact_name_with_space():
+        result = add_contact(["Mary Jane", "1234567890"], AddressBook())
+>       assert result == "Contact added."  # падает: код возвращает Error
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert 'Error: name ...only letters.' == 'Contact added.'
+E         
+E         - Contact added.
+E         + Error: name must contain only letters.
+
+tests\test_handlers.py:36: AssertionError
+_________________________ test_birthdays_no_upcoming __________________________
+
+    def test_birthdays_no_upcoming():
+        book = make_book(("Eve", "1234567890"))
+>       result = birthdays([], book)  # правильная сигнатура как у всех хендлеров — падает
+                 ^^^^^^^^^^^^^^^^^^^
+
+tests\test_handlers.py:195: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = ([], {'Eve': <models.record.Record object at 0x000001E41E99D050>})
+kwargs = {}
+
+    @functools.wraps(func)
+    def inner(*args, **kwargs):
+        try:
+>           return func(*args, **kwargs)
+                   ^^^^^^^^^^^^^^^^^^^^^
+E           TypeError: birthdays() takes 1 positional argument but 2 were given
+
+decorators\errors.py:8: TypeError
+________________________ test_birthdays_with_upcoming _________________________
+
+    def test_birthdays_with_upcoming():
+        book = make_book(("Eve", "1234567890"))
+        soon = date.today() + timedelta(days=2)
+        add_birthday(["Eve", soon.strftime("%d.%m.%Y")], book)
+>       result = birthdays([], book)  # правильная сигнатура как у всех хендлеров — падает
+                 ^^^^^^^^^^^^^^^^^^^
+
+tests\test_handlers.py:202: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+args = ([], {'Eve': <models.record.Record object at 0x000001E41E958D70>})
+kwargs = {}
+
+    @functools.wraps(func)
+    def inner(*args, **kwargs):
+        try:
+>           return func(*args, **kwargs)
+                   ^^^^^^^^^^^^^^^^^^^^^
+E           TypeError: birthdays() takes 1 positional argument but 2 were given
+
+decorators\errors.py:8: TypeError
+________________________ test_birthday_impossible_date ________________________
+
+    def test_birthday_impossible_date():
+        with pytest.raises(ValueError) as exc_info:
+            Birthday("30.02.2000")
+        assert "Invalid date" in str(exc_info.value)
+>       assert "format" not in str(exc_info.value).lower()  # не должно говорить про формат
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert 'format' not in 'invalid dat...e dd.mm.yyyy'
+E         
+E         'format' is contained here:
+E           invalid date format. use dd.mm.yyyy
+E         ?              ++++++
+
+tests\test_models.py:50: AssertionError
+__________________________ test_record_str_no_phones __________________________
+
+    def test_record_str_no_phones():
+        r = Record("Alice")
+        s = str(r)
+>       assert "phones: —" in s  # ожидаем прочерк, а не пустую строку
+        ^^^^^^^^^^^^^^^^^^^^^^^
+E       AssertionError: assert 'phones: —' in 'Contact name: Alice, phones: , email: N/A, birthday: N/A'
+
+tests\test_models.py:124: AssertionError
+___________________ TestPhoneValidation.test_unicode_digits ___________________
+
+self = <test_validation.TestPhoneValidation object at 0x000001E41E94F070>
+
+    def test_unicode_digits(self):
+>       with pytest.raises(ValueError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests\test_validation.py:83: Failed
+_________________ TestBirthdayValidation.test_no_leading_zero _________________
+
+self = <test_validation.TestBirthdayValidation object at 0x000001E41E866570>
+
+    def test_no_leading_zero(self):
+>       with pytest.raises(ValueError):
+             ^^^^^^^^^^^^^^^^^^^^^^^^^
+E       Failed: DID NOT RAISE <class 'ValueError'>
+
+tests\test_validation.py:181: Failed
+=========================== short test summary info ===========================
+FAILED tests/test_handlers.py::test_add_contact_name_with_space - AssertionEr...
+FAILED tests/test_handlers.py::test_birthdays_no_upcoming - TypeError: birthd...
+FAILED tests/test_handlers.py::test_birthdays_with_upcoming - TypeError: birt...
+FAILED tests/test_models.py::test_birthday_impossible_date - AssertionError: ...
+FAILED tests/test_models.py::test_record_str_no_phones - AssertionError: asse...
+FAILED tests/test_validation.py::TestPhoneValidation::test_unicode_digits - F...
+FAILED tests/test_validation.py::TestBirthdayValidation::test_no_leading_zero
+======================== 7 failed, 157 passed in 0.30s ========================
+
+================================================================================
+BUG SUMMARY
+================================================================================
+
++----------------------------------------------------+---------------------------------------------------------+------------------------------------+
+| Failed test                                        | Bug                                                     | File to fix                        |
++----------------------------------------------------+---------------------------------------------------------+------------------------------------+
+| test_add_contact_name_with_space                   | isalpha() rejects names with spaces ("Mary Jane" not    | handlers/contact_handlers.py:7     |
+|                                                    | accepted)                                               |                                    |
++----------------------------------------------------+---------------------------------------------------------+------------------------------------+
+| test_birthdays_no_upcoming                         | birthdays() signature is (book) instead of (args, book) | handlers/birthday_handlers.py:27   |
++----------------------------------------------------+---------------------------------------------------------+------------------------------------+
+| test_birthdays_with_upcoming                       | birthdays() signature is (book) instead of (args, book) | handlers/birthday_handlers.py:27   |
++----------------------------------------------------+---------------------------------------------------------+------------------------------------+
+| test_birthday_impossible_date                      | Error message says 'Invalid date format' for impossible | models/fields.py:28                |
+|                                                    | dates (e.g. 30.02)                                      |                                    |
++----------------------------------------------------+---------------------------------------------------------+------------------------------------+
+| test_record_str_no_phones                          | Record.__str__ outputs 'phones: ' (empty) instead of    | models/record.py:33                |
+|                                                    | 'phones: -'                                             |                                    |
++----------------------------------------------------+---------------------------------------------------------+------------------------------------+
+| test_unicode_digits                                | Phone accepts Unicode digits (Arabic etc.) — isdigit()  | models/fields.py:18                |
+|                                                    | returns True for non-ASCII                              |                                    |
++----------------------------------------------------+---------------------------------------------------------+------------------------------------+
+| test_no_leading_zero                               | Birthday('1.1.2000') accepted without leading zeros,    | models/fields.py:25                |
+|                                                    | violates DD.MM.YYYY format                              |                                    |
++----------------------------------------------------+---------------------------------------------------------+------------------------------------+
+
+Result: 7 failed  |  7 known bugs  |  0 unexpected
+================================================================================

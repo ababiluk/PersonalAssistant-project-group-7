@@ -1,4 +1,3 @@
-
 from handlers.display import (
     show_help,
     _print
