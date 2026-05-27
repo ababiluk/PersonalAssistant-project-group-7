@@ -31,11 +31,20 @@ class Birthday(Field):
     def __str__(self):
         return self.value.strftime("%d.%m.%Y")
 
+
 class Email(Field):
     def __init__(self, value):
-        if not re.fullmatch(r"[\w.-]+@[\w.-]+\.[a-zA-Z]{2,}", value):
-            raise ValueError(f"Invalid email format: {value}")
+        pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+        if not re.match(pattern, value):
+            raise ValueError("Invalid email format. Example: user@example.com")
         super().__init__(value)
-
+        
 class Address(Field):
     pass
+
+class Note(Field):
+    def __init__(self, value, note_id):
+        if not value.strip():
+            raise ValueError("Note cannot be empty.")
+        super().__init__(value.strip())
+        self.id = note_id
