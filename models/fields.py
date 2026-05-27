@@ -16,9 +16,14 @@ class Name(Field):
 
 class Phone(Field):
     def __init__(self, value):
-        if not value.isdigit() or len(value) != 10:
-            raise ValueError(f"Phone number must contain exactly 10 digits: {value}")
-        super().__init__(value)
+        cleaned_value = re.sub(r"\D", "", value)
+        if len(cleaned_value) != 10:
+            raise ValueError(f"Phone number must contain exactly 10 digits: {cleaned_value}")
+        super().__init__(cleaned_value)
+    
+    def __str__(self):
+        v=self.value
+        return f"+38({v[:3]}){v[3:6]}-{v[6:8]}-{v[8:]}"
 
 
 class Birthday(Field):
