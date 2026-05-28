@@ -1,140 +1,201 @@
+"""
+Run all tests and save output to a timestamped log file.
+Appends a results summary table at the end of the log.
+
+Usage:
+    python tests/run_tests.py
+"""
+import os
+import re
 import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
 
-LOG_DIR = Path(__file__).parent / "logs"
+ROOT = Path(__file__).parent.parent
+LOGS_DIR = Path(__file__).parent / "logs"
+LOGS_DIR.mkdir(exist_ok=True)
 
-KNOWN_BUGS = {
-    "test_add_contact_name_with_space": (
-        "isalpha() rejects names with spaces (\"Mary Jane\" not accepted)",
-        "handlers/contact_handlers.py:7",
-    ),
-    "test_birthdays_no_upcoming": (
-        "birthdays() signature is (book) instead of (args, book)",
-        "handlers/birthday_handlers.py:27",
-    ),
-    "test_birthdays_with_upcoming": (
-        "birthdays() signature is (book) instead of (args, book)",
-        "handlers/birthday_handlers.py:27",
-    ),
-    "test_birthday_impossible_date": (
-        "Error message says 'Invalid date format' for impossible dates (e.g. 30.02)",
-        "models/fields.py:28",
-    ),
-    "test_record_str_no_phones": (
-        "Record.__str__ outputs 'phones: ' (empty) instead of 'phones: -'",
-        "models/record.py:33",
-    ),
-    "test_unicode_digits": (
-        "Phone accepts Unicode digits (Arabic etc.) — isdigit() returns True for non-ASCII",
-        "models/fields.py:18",
-    ),
-    "test_no_leading_zero": (
-        "Birthday('1.1.2000') accepted without leading zeros, violates DD.MM.YYYY format",
-        "models/fields.py:25",
-    ),
-}
+timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+log_path = LOGS_DIR / f"test_run_{timestamp}.log"
 
-COL = (50, 55, 34)
+# PYTHONIOENCODING=utf-8 forces pytest to write UTF-8 even on Windows cp1252 terminals
+ENV = {**os.environ, "PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1"}
+
+# ---------------------------------------------------------------------------
+# Run pytest  (-r xf includes xfail + failed reasons in short test summary)
+# ---------------------------------------------------------------------------
+result = subprocess.run(
+    [sys.executable, "-m", "pytest", "tests/", "-v", "--tb=short", "-r", "xf"],
+    capture_output=True,
+    text=True,
+    encoding="utf-8",
+    errors="replace",
+    env=ENV,
+)
+output = result.stdout + result.stderr
+
+# ---------------------------------------------------------------------------
+# Parse short test summary  →  failed_rows / xfail_rows
+# Format of each relevant line:
+#   FAILED tests/file.py::Class::test_name - error message
+#   XFAIL  tests/file.py::Class::test_name - reason text
+# ---------------------------------------------------------------------------
+failed_rows = []  # (short_file, cls, test, detail)
+xfail_rows  = []
+
+summary_section = re.search(
+    r"={5,}\s*short test summary info\s*={5,}\n(.*?)(?:\n={5,}|\Z)",
+    output,
+    re.DOTALL,
+)
+if summary_section:
+    for line in summary_section.group(1).splitlines():
+        m = re.match(r"^(FAILED|ERROR|XFAIL)\s+(tests/.+?)\s+-\s+(.*)", line.strip())
+        if not m:
+            continue
+        status, test_id, detail = m.groups()
+        parts      = test_id.split("::")
+        short_file = Path(parts[0]).name
+        cls        = parts[1] if len(parts) > 1 else ""
+        test       = parts[2] if len(parts) > 2 else ""
+        row = (short_file, cls, test, detail.strip())
+        if status in ("FAILED", "ERROR"):
+            failed_rows.append(row)
+        else:
+            xfail_rows.append(row)
+
+# ---------------------------------------------------------------------------
+# Find fix location in source code
+# Strategy (tried in order):
+#   1. Extract method names from test_name and grep for "def <method>("
+#   2. Extract class entity from test class name and grep for "class <Entity>("
+# Source search paths: models/, handlers/, decorators/
+# ---------------------------------------------------------------------------
+SOURCE_DIRS = [ROOT / d for d in ("models", "handlers", "decorators")]
 
 
-def _row(a="", b="", c=""):
-    return f"| {a:<{COL[0]}} | {b:<{COL[1]}} | {c:<{COL[2]}} |"
+def _grep_source(pattern):
+    """Return 'filename:line_number' for the first match of pattern in source dirs."""
+    for d in SOURCE_DIRS:
+        if not d.exists():
+            continue
+        for py in sorted(d.glob("*.py")):
+            for i, line in enumerate(
+                py.read_text(encoding="utf-8", errors="replace").splitlines(), 1
+            ):
+                if re.search(pattern, line):
+                    return f"{py.name}:{i}"
+    return None
 
 
-def _divider():
-    return f"+{'-' * (COL[0]+2)}+{'-' * (COL[1]+2)}+{'-' * (COL[2]+2)}+"
+def fix_location(cls_name, test_name):
+    """
+    Search production source code for the most relevant fix point.
 
-
-def build_bug_table(failed_tests: list) -> str:
-    known = [(t, *KNOWN_BUGS[t]) for t in failed_tests if t in KNOWN_BUGS]
-    unknown = [t for t in failed_tests if t not in KNOWN_BUGS]
-
-    lines = [
-        "",
-        "=" * 80,
-        "BUG SUMMARY",
-        "=" * 80,
-        "",
-        _divider(),
-        _row("Failed test", "Bug", "File to fix"),
-        _divider(),
+    Priority:
+      1. def <method>  extracted from test name (longest match first)
+      2. class <Entity>  extracted from test class name
+    """
+    # Build candidate method names from test name
+    # test_edit_note_preserves_tags  ->  ["edit_note_preserves", "edit_note", "edit"]
+    raw = re.sub(r"^test_", "", test_name).split("_")
+    method_candidates = [
+        "_".join(raw[:n])
+        for n in range(min(4, len(raw)), 1, -1)
     ]
 
-    for test, bug, filepath in known:
-        words = bug.split()
-        bug_lines, cur = [], ""
-        for w in words:
-            if len(cur) + len(w) + 1 > COL[1]:
-                bug_lines.append(cur)
-                cur = w
-            else:
-                cur = (cur + " " + w).strip()
-        bug_lines.append(cur)
+    for method in method_candidates:
+        loc = _grep_source(rf"def {re.escape(method)}\b")
+        if loc:
+            return loc
 
-        lines.append(_row(test, bug_lines[0], filepath))
-        for extra in bug_lines[1:]:
-            lines.append(_row("", extra, ""))
-        lines.append(_divider())
+    # Extract class entity from test class name:
+    # TestPhoneField -> Phone,  TestNoteCommands -> Note,  TestAddressBook -> AddressBook
+    entity = re.sub(r"^Test|Field$|Commands?$", "", cls_name)
+    if entity:
+        loc = _grep_source(rf"class {re.escape(entity)}\b")
+        if loc:
+            return loc
 
-    if unknown:
-        lines += ["", "Unexpected failures (not in known-bugs map):"]
-        for t in unknown:
-            lines.append(f"  - {t}")
+    return "N/A"
 
-    lines += [
-        "",
-        f"Result: {len(failed_tests)} failed  |  {len(known)} known bugs  |  "
-        f"{len(unknown)} unexpected",
-        "=" * 80,
-    ]
+
+# Attach fix locations to each row  →  (file, cls, test, detail, fix_loc)
+def _enrich(rows):
+    return [(*row, fix_location(row[1], row[2])) for row in rows]
+
+
+failed_rows = _enrich(failed_rows)
+xfail_rows  = _enrich(xfail_rows)
+
+# ---------------------------------------------------------------------------
+# Table renderer
+# ---------------------------------------------------------------------------
+def _table(headers, rows, max_detail=55):
+    """Plain ASCII box table. 'detail' column capped at max_detail chars."""
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row):
+            widths[i] = max(widths[i], len(str(cell)))
+    widths[-2] = min(widths[-2], max_detail)   # detail/reason column  (second-to-last)
+
+    sep = "+" + "+".join("-" * (w + 2) for w in widths) + "+"
+    fmt = "|" + "|".join(f" {{:<{w}}} " for w in widths) + "|"
+
+    lines = [sep, fmt.format(*headers), sep]
+    for row in rows:
+        cells = list(row)
+        cells[-2] = str(cells[-2])[:widths[-2]]  # truncate detail column
+        lines.append(fmt.format(*cells))
+    lines.append(sep)
     return "\n".join(lines)
 
+# ---------------------------------------------------------------------------
+# Build summary
+# ---------------------------------------------------------------------------
+SEP = "=" * 72
+lines = ["", SEP, "RESULTS SUMMARY", SEP, ""]
 
-def main():
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    log_path = LOG_DIR / f"test_run_{timestamp}.log"
+if failed_rows:
+    lines += [
+        f"  FAILED / ERROR : {len(failed_rows)}",
+        "",
+        _table(
+            ["File", "Class", "Test", "Error", "Fix (file:line)"],
+            failed_rows,
+        ),
+        "",
+    ]
+else:
+    lines += ["  FAILED : 0  --  all tests passed", ""]
 
-    print(f"Running tests...  (log -> {log_path})\n")
+if xfail_rows:
+    lines += [
+        f"  XFAILED : {len(xfail_rows)}  (known bugs, expected to fail)",
+        "",
+        _table(
+            ["File", "Class", "Test", "Reason", "Fix (file:line)"],
+            xfail_rows,
+        ),
+        "",
+    ]
 
-    project_root = Path(__file__).parent.parent
-    proc = subprocess.run(
-        [sys.executable, "-m", "pytest", "tests/", "-v"],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        cwd=project_root,
-    )
+summary = "\n".join(lines)
 
-    output = proc.stdout + (proc.stderr or "")
-    print(output.encode("utf-8", errors="replace").decode("utf-8", errors="replace"))
+# ---------------------------------------------------------------------------
+# Write log and print to console
+# ---------------------------------------------------------------------------
+log_path.write_text(output + summary, encoding="utf-8")
 
-    failed = []
-    for line in output.splitlines():
-        if line.startswith("FAILED ") and "::" in line:
-            # handles both "file::test_name" and "file::ClassName::test_name"
-            test_name = line.split("::")[-1].split(" ")[0]
-            if test_name:
-                failed.append(test_name)
+try:
+    print(output, end="")
+    print(summary)
+except UnicodeEncodeError:
+    safe = (output + summary).encode(
+        sys.stdout.encoding or "ascii", errors="replace"
+    ).decode(sys.stdout.encoding or "ascii")
+    print(safe)
 
-    header = (
-        f"Test run: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        + "=" * 80 + "\n\n"
-    )
-
-    with open(log_path, "w", encoding="utf-8") as f:
-        f.write(header)
-        f.write(output)
-        if failed:
-            f.write(build_bug_table(failed))
-            f.write("\n")
-
-    print(f"\nLog saved: {log_path}")
-    return proc.returncode
-
-
-if __name__ == "__main__":
-    sys.exit(main())
+print(f"\nLog saved -> {log_path}")
+sys.exit(result.returncode)

@@ -1,56 +1,51 @@
-# Running Automated Tests
+# Running Tests
 
 ## Requirements
 
 - Python 3.10+
 - pytest
 
-Install pytest if not already installed:
-
-```
+```bash
 pip install pytest
-python3 -m pip install pytest
 ```
 
 ---
 
-## One-command run (recommended)
+## One command (recommended)
 
-Runs all tests, prints results, and saves a timestamped log automatically:
+Runs all tests, prints results to the console, and saves a timestamped log automatically:
 
-```
+```bash
 python tests/run_tests.py
 ```
 
-The log is saved to `tests/logs/test_run_YYYY-MM-DD_HH-MM-SS.log` and includes:
-- Full pytest output
-- Bug summary table at the end (for any known failing tests)
+Log is saved to `tests/logs/test_run_YYYY-MM-DD_HH-MM-SS.log`.
 
 ---
 
-## Manual pytest commands
+## Direct pytest commands
 
 Run all tests:
-```
+```bash
 python -m pytest tests/ -v
 ```
 
-Run a single test file:
-```
-python -m pytest tests/test_models.py -v
-python -m pytest tests/test_handlers.py -v
-python -m pytest tests/test_validation.py -v
-```
-
-Run a single test by name:
-```
-python -m pytest tests/ -v -k "test_phone_valid"
+Run a single file:
+```bash
+python -m pytest tests/test_fields.py -v
+python -m pytest tests/test_commands.py -v
+python -m pytest tests/test_e2e.py -v
 ```
 
-Run only failing tests from the last run:
-```
-python -m pytest tests/ --lf
-```
+Other useful flags:
+
+| Flag | Effect |
+|---|---|
+| `-k "test_phone"` | Run only tests whose name matches the pattern |
+| `--lf` | Re-run only tests that failed last time |
+| `-x` | Stop after the first failure |
+| `--tb=short` | Shorter traceback on failures |
+| `-q` | Minimal output — names + summary only |
 
 ---
 
@@ -58,30 +53,32 @@ python -m pytest tests/ --lf
 
 | File | What it covers |
 |---|---|
-| `tests/test_models.py` | `Phone`, `Birthday`, `Record`, `AddressBook` |
-| `tests/test_handlers.py` | All command handlers + `parse_input`, `save_data`, `load_data` |
-| `tests/test_validation.py` | Input validation edge cases for each field |
-| `tests/test_notes.py` | `Note` field, `Record` note methods, all note handlers |
+| `test_fields.py` | Field-level validation: `Phone`, `Birthday`, `Email`, `Note`, `Name`, `Address` |
+| `test_commands.py` | `Record` and `AddressBook` models, all 23 command handlers, input parsing, persistence |
+| `test_e2e.py` | Full session: empty book -> add contacts -> all commands -> save/reload |
 
 ---
 
-## Log files
+## Understanding xfail
 
-All logs are stored in `tests/logs/`.
-Each run creates a new file named `test_run_YYYY-MM-DD_HH-MM-SS.log`.
-If any tests fail, a bug summary table is appended at the end of the log.
+Tests marked `@pytest.mark.xfail` document **known bugs**.
+pytest reports them as `xfailed` — the suite stays green while bugs are tracked.
 
----
+```
+xfailed  — expected failure, bug not yet fixed
+xpassed  — test unexpectedly passed (bug was fixed — remove the xfail marker)
+```
 
-## Known failing tests
-
-These tests intentionally fail to document real bugs in the code:
+### Current known bugs
 
 | Test | Bug |
 |---|---|
-| `test_add_contact_name_with_space` | `isalpha()` rejects names with spaces |
-| `test_birthdays_no_upcoming/with_upcoming` | `birthdays()` has wrong signature |
-| `test_birthday_impossible_date` | Misleading error message for impossible dates |
-| `test_record_str_no_phones` | Empty phones field in `__str__` output |
-| `test_unicode_digits` | `Phone` accepts non-ASCII digits |
-| `test_no_leading_zero` | `Birthday` accepts `1.1.2000` without leading zeros |
+| `TestPhoneField::test_plus_prefix_rejected` | `Phone("+1234567890")` strips `+` and accepts the number |
+| `TestPhoneField::test_unicode_arabic_digits_rejected` | `isdigit()` accepts Arabic-Indic digits |
+| `TestBirthdayField::test_no_leading_zero_rejected` | `Birthday("1.1.2000")` accepted without leading zeros |
+| `TestNoteCommands::test_edit_note_preserves_tags` | `edit_note` replaces the `Note` object, losing all tags |
+| `TestNameField::test_empty_name_raises` | `Name("")` accepted — no field-level validation |
+| `TestNameField::test_whitespace_only_name_raises` | `Name("   ")` accepted — no field-level validation |
+| `TestNameField::test_non_letter_name_raises` | `Name("Alice123")` accepted — no field-level validation |
+| `TestAddressField::test_empty_address_raises` | `Address("")` accepted — no field-level validation |
+| `TestAddressField::test_whitespace_only_address_raises` | `Address("   ")` accepted — no field-level validation |
