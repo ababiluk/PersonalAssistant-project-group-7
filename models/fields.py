@@ -44,8 +44,10 @@ class Email(Field):
             raise ValueError("Invalid email format. Example: user@example.com")
         super().__init__(value)
         
+
 class Address(Field):
     pass
+
 
 class Note(Field):
     def __init__(self, value, note_id):
@@ -53,3 +55,8 @@ class Note(Field):
             raise ValueError("Note cannot be empty.")
         super().__init__(value.strip())
         self.id = note_id
+        self.tags = []  # initialize tags list for the note
+
+    def add_tag(self, tag):
+        if tag not in self.tags:  # prevent duplicate tags
+            self.tags.append(tag)

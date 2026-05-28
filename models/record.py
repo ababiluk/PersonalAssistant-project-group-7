@@ -13,9 +13,6 @@ class Record:
     def add_phone(self, phone):
         self.phones.append(Phone(phone))
     
-    def add_email(self, email):
-        self.email = Email(email)
-        
     def add_address(self, address):
         self.address = Address(address)
 
@@ -37,6 +34,9 @@ class Record:
     def add_birthday(self, birthday):
         self.birthday = Birthday(birthday)
 
+    def add_email(self, email):
+        self.email = Email(email)
+
     def add_note(self, text, note_id):
         self.notes.append(Note(text, note_id))
 
@@ -54,11 +54,17 @@ class Record:
                 return
         raise IndexError(f"Note with id {note_id} not found.")
 
+    def add_tag_to_note(self, note_id, tag):
+        for note in self.notes:  # find note by ID and add tag
+            if note.id == note_id:
+                note.add_tag(tag)
+                return
+        raise IndexError(f"Note with id {note_id} not found.")
+
     def __str__(self):
         birthday = str(self.birthday) if self.birthday else "N/A"
         email = str(self.email) if self.email else "N/A"
         address = str(self.address) if self.address else "N/A"
 
         phones = "; ".join(p.value for p in self.phones) if self.phones else "No phones"
-        return f"Contact name: {self.name.value}, phones: {phones}, birthday: {birthday},email: {email}, Address: {address}"
-    
+        return f"Contact name: {self.name.value}, phones: {phones}, birthday: {birthday}, email: {email}, Address: {address}"

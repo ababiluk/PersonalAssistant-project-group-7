@@ -25,6 +25,9 @@ from handlers.note_handlers import (
     show_all_notes,
     find_notes,
     all_with_notes,
+    add_tag,
+    find_by_tag,
+    sort_by_tags,
 )
 
 commands = {
@@ -48,4 +51,7 @@ commands = {
     "show-all-notes": show_all_notes,
     "all-with-notes": all_with_notes,
     "find-notes": find_notes,
+    "add-tag": add_tag,
+    "find-by-tag": find_by_tag,
+    "sort-by-tags": sort_by_tags,
 }
