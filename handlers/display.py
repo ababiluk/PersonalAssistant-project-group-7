@@ -130,13 +130,21 @@ def show_help(_args, _book):
     table.add_row("show-birthday \\[name]", "Show birthday")
     table.add_row("birthdays \\[days]", "Upcoming birthdays (default: 7 days)")
     table.add_row("find \\[query]", "Search contacts by name or phone")
+    
+    # updated commands for notes
     table.add_row("add-note \\[name] \\[text]", "Add a note to a contact")
-    table.add_row("edit-note \\[name] \\[#] \\[new text]", "Edit a note by index")
-    table.add_row("delete-note \\[name] \\[#]", "Delete a note by index")
+    table.add_row("edit-note \\[name]", "Edit a note by ID") 
+    table.add_row("delete-note \\[name]", "Delete a note by ID") 
     table.add_row("show-notes \\[name]", "Show all notes for a contact")
     table.add_row("show-all-notes", "Show all notes across all contacts")
     table.add_row("all-with-notes", "Show all contacts with all fields including notes")
     table.add_row("find-notes \\[query]", "Search notes across all contacts")
+    
+    # new commands for tags
+    table.add_row("add-tag \\[name]", "Add a tag to a contact's note")
+    table.add_row("find-by-tag \\[tag]", "Search notes by a specific tag")
+    table.add_row("sort-by-tags", "Show all notes sorted by tags")
+    
     table.add_row("help", "Show this message")
     table.add_row("close / exit", "Quit the bot")
 
