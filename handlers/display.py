@@ -4,6 +4,7 @@ from rich.table import Table
 from decorators import input_error
 from models import AddressBook
 from rich.console import Console
+from handlers.command_meta import COMMAND_META
 
 console = Console()
 
@@ -123,34 +124,13 @@ def show_help(_args, _book):
     table.add_column("Command", style="green")
     table.add_column("Description")
 
-    table.add_row("hello", "Greet the bot")
-    table.add_row("add \\[name] \\[phone]", "Add or update a contact")
-    table.add_row("change \\[name] \\[old] \\[new]", "Change phone number")
-    table.add_row("phone \\[name]", "Show phone number(s)")
-    table.add_row("all", "Show all contacts")
-    table.add_row("delete-contact \\[name]", "Delete a contact")
-    table.add_row("delete-phone \\[name] \\[phone]", "Remove a specific phone")
-    table.add_row("add-email \\[name] \\[email]", "Add email to a contact")
-    table.add_row("add-birthday \\[name] \\[DD.MM.YYYY]", "Add birthday")
-    table.add_row("show-birthday \\[name]", "Show birthday")
-    table.add_row("birthdays \\[days]", "Upcoming birthdays (default: 7 days)")
-    table.add_row("find \\[query]", "Search contacts by name or phone")
-    
-    # updated commands for notes
-    table.add_row("add-note \\[name] \\[text]", "Add a note to a contact")
-    table.add_row("edit-note \\[name]", "Edit a note by ID") 
-    table.add_row("delete-note \\[name]", "Delete a note by ID") 
-    table.add_row("show-notes \\[name]", "Show all notes for a contact")
-    table.add_row("show-all-notes", "Show all notes across all contacts")
-    table.add_row("all-with-notes", "Show all contacts with all fields including notes")
-    table.add_row("find-notes \\[query]", "Search notes across all contacts")
-    
-    # new commands for tags
-    table.add_row("add-tag \\[name]", "Add a tag to a contact's note")
-    table.add_row("find-by-tag \\[tag]", "Search notes by a specific tag")
-    table.add_row("sort-by-tags", "Show all notes sorted by tags")
-    
-    table.add_row("help", "Show this message")
-    table.add_row("close / exit", "Quit the bot")
+    for cmd, (args, desc) in COMMAND_META.items():
+        if cmd == "exit":
+            continue
+        if cmd == "close":
+            table.add_row("close / exit", desc)
+            continue
+        args_escaped = args.replace("[", "\\[")
+        table.add_row(f"{cmd} {args_escaped}".strip(), desc)
 
     return table

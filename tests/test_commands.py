@@ -8,8 +8,15 @@ from datetime import date, timedelta
 from unittest.mock import patch
 from rich.table import Table
 
+import ast
+from pathlib import Path
+
+from prompt_toolkit.document import Document
+
 from models.record import Record
 from models.address_book import AddressBook
+from handlers.command_meta import COMMAND_META
+from handlers.command_hints import CommandCompleter
 from handlers.contact_handlers import (
     add_contact, change_contact, delete_contact,
     remove_phone, add_email, find_contact,
@@ -610,6 +617,21 @@ class TestDisplayCommands:
     def test_show_help_returns_table(self):
         assert isinstance(show_help([], AddressBook()), Table)
 
+    def test_show_help_row_count_matches_command_meta(self):
+        # "exit" is merged with "close" → one fewer row than COMMAND_META entries
+        expected = len(COMMAND_META) - 1
+        assert show_help([], AddressBook()).row_count == expected
+
+    def test_show_help_contains_known_commands(self):
+        from io import StringIO
+        from rich.console import Console
+        table = show_help([], AddressBook())
+        buf = StringIO()
+        Console(file=buf, width=200, force_terminal=False).print(table)
+        rendered = buf.getvalue()
+        for cmd in ("add", "change", "find", "add-note", "add-tag", "birthdays"):
+            assert cmd in rendered
+
     def test_hello_returns_non_empty_string(self):
         result = hello_message([], AddressBook())
         assert isinstance(result, str) and len(result) > 0
@@ -668,3 +690,98 @@ class TestPersistence:
         assert str(r.birthday) == "01.06.1990"
         assert str(r.email) == "alice@example.com"
         assert r.notes[0].value == "a note"
+
+
+# =============================================================================
+# COMMAND_META contract
+# =============================================================================
+
+def _registered_commands():
+    """
+    Parse commands.py with AST to extract the keys of the 'commands' dict
+    without importing the module (importing triggers a circular import via
+    handlers/utils.py -> commands.py).
+    """
+    src = (Path(__file__).parent.parent / "commands.py").read_text(encoding="utf-8")
+    tree = ast.parse(src)
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id == "commands" for t in node.targets)
+            and isinstance(node.value, ast.Dict)
+        ):
+            return {
+                k.value for k in node.value.keys
+                if isinstance(k, ast.Constant)
+            }
+    return set()
+
+
+class TestCommandMeta:
+
+    def test_all_registered_commands_have_meta_entry(self):
+        # Every command in commands.py must appear in COMMAND_META so that
+        # tab-completion and help stay in sync when new commands are added.
+        registered = _registered_commands()
+        missing = registered - set(COMMAND_META.keys())
+        assert missing == set(), f"Commands missing from COMMAND_META: {missing}"
+
+    def test_each_entry_is_two_string_tuple(self):
+        for cmd, value in COMMAND_META.items():
+            assert isinstance(value, tuple) and len(value) == 2, \
+                f"COMMAND_META['{cmd}'] should be a 2-tuple"
+            args_hint, description = value
+            assert isinstance(args_hint, str), f"args_hint for '{cmd}' must be str"
+            assert isinstance(description, str) and description, \
+                f"description for '{cmd}' must be a non-empty str"
+
+    def test_no_duplicate_command_names(self):
+        assert len(COMMAND_META) == len(set(COMMAND_META))
+
+
+# =============================================================================
+# CommandCompleter  (tab-completion logic)
+# =============================================================================
+
+class TestCommandCompleter:
+
+    def _completions(self, text):
+        """Return list of completion strings for the given input text."""
+        doc = Document(text)
+        return [c.text for c in CommandCompleter().get_completions(doc, None)]
+
+    def test_empty_input_returns_all_commands(self):
+        result = self._completions("")
+        assert set(result) == set(COMMAND_META.keys())
+
+    def test_prefix_filters_matching_commands(self):
+        result = self._completions("ad")
+        assert all(c.startswith("ad") for c in result)
+        assert "add" in result
+        assert "add-note" in result
+        assert "add-birthday" in result
+
+    def test_exact_prefix_returns_itself_and_longer_matches(self):
+        result = self._completions("add")
+        assert "add" in result
+        assert "add-note" in result
+
+    def test_unmatched_prefix_returns_empty(self):
+        assert self._completions("xyz") == []
+
+    def test_input_with_space_returns_empty(self):
+        # Completer only handles the command word; stops after a space
+        assert self._completions("add ") == []
+        assert self._completions("add Alice") == []
+
+    def test_matching_is_case_insensitive(self):
+        lower = set(self._completions("add"))
+        upper = set(self._completions("ADD"))
+        assert lower == upper
+
+    def test_completion_display_meta_contains_description(self):
+        doc = Document("hello")
+        completions = list(CommandCompleter().get_completions(doc, None))
+        assert len(completions) == 1
+        meta = str(completions[0].display_meta)
+        assert "Greet" in meta
