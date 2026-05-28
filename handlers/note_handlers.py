@@ -2,6 +2,7 @@ from decorators import input_error
 from models import AddressBook
 from rich.table import Table
 from rich.console import Console
+from handlers.display import show_paginated_table
 
 console = Console()
 
@@ -138,50 +139,53 @@ def all_with_notes(args, book: AddressBook):
     if not book.data:
         return "No contacts saved."
 
-    table = Table(title="All Contacts", header_style="bold cyan")
-    table.add_column("Name", style="green")
-    table.add_column("Phones")
-    table.add_column("Email")
-    table.add_column("Birthday")
-    table.add_column("Notes")
-
+    columns = [
+        ("Name", {"style": "green"}),
+        ("Phones", {}),
+        ("Email", {}),
+        ("Birthday", {}),
+        ("Address", {}),
+        ("Notes", {}),
+        ("Tags", {"style": "yellow"}),
+    ]
+    rows = []
     for record in book.data.values():
         phones = "; ".join(p.value for p in record.phones) or "—"
         email = str(record.email) if record.email else "—"
         birthday = str(record.birthday) if record.birthday else "—"
-        
-        notes_list = []
-        for n in record.notes:
-            tag_str = f" [#{', #'.join(n.tags)}]" if n.tags else ""
-            notes_list.append(f"[{n.id}] {n.value}{tag_str}")
-            
-        notes_text = "\n".join(notes_list) or "—"
-        table.add_row(record.name.value, phones, email, birthday, notes_text)
+        address = str(record.address) if record.address else "—"
 
-    return table
+        notes_list = []
+        all_tags = []
+        for n in record.notes:
+            notes_list.append(f"[{n.id}] {n.value}")
+            all_tags.extend(n.tags)
+
+        notes_text = "\n".join(notes_list) or "—"
+        tags_text = ", ".join(dict.fromkeys(all_tags)) or "—"
+        rows.append((record.name.value, phones, email, birthday, address, notes_text, tags_text))
+
+    return show_paginated_table("All Contacts", columns, rows)
 
 
 @input_error
 def show_all_notes(args, book: AddressBook):
-    results = []
+    rows = []
     for record in book.data.values():
         for note in record.notes:
-            results.append((record.name.value, note.id, note.value, note.tags))
+            tags_str = ", ".join(note.tags) if note.tags else "—"
+            rows.append((record.name.value, str(note.id), note.value, tags_str))
 
-    if not results:
+    if not rows:
         return "No notes saved."
 
-    table = Table(title="All Notes", header_style="bold cyan")
-    table.add_column("Contact", style="green")
-    table.add_column("ID", style="dim", width=6)
-    table.add_column("Note", style="white")
-    table.add_column("Tags", style="yellow")
-
-    for contact_name, note_id, text, tags in results:
-        tags_str = ", ".join(tags) if tags else "—"
-        table.add_row(contact_name, str(note_id), text, tags_str)
-
-    return table
+    columns = [
+        ("Contact", {"style": "green"}),
+        ("ID", {"style": "dim", "width": 6}),
+        ("Note", {"style": "white"}),
+        ("Tags", {"style": "yellow"}),
+    ]
+    return show_paginated_table("All Notes", columns, rows)
 
 
 @input_error
@@ -203,17 +207,15 @@ def find_notes(args, book: AddressBook):
     if not results:
         return f"No notes found for query '{query}'."
 
-    table = Table(title=f"Notes matching '{query}'", header_style="bold cyan")
-    table.add_column("Contact", style="green")
-    table.add_column("ID", style="dim", width=6)
-    table.add_column("Note", style="white")
-    table.add_column("Tags", style="yellow")
-
-    for contact_name, note_id, text, tags in results:
-        tags_str = ", ".join(tags) if tags else "—"
-        table.add_row(contact_name, str(note_id), text, tags_str)
-
-    return table
+    columns = [
+        ("Contact", {"style": "green"}),
+        ("ID", {"style": "dim", "width": 6}),
+        ("Note", {"style": "white"}),
+        ("Tags", {"style": "yellow"}),
+    ]
+    rows = [(name, str(nid), text, ", ".join(tags) if tags else "—")
+            for name, nid, text, tags in results]
+    return show_paginated_table(f"Notes matching '{query}'", columns, rows)
 
 
 @input_error
@@ -232,17 +234,15 @@ def find_by_tag(args, book: AddressBook):
     if not results:
         return f"No notes found with tag '{tag_query}'."
 
-    table = Table(title=f"Notes with tag '{tag_query}'", header_style="bold cyan")
-    table.add_column("Contact", style="green")
-    table.add_column("ID", style="dim", width=6)
-    table.add_column("Note", style="white")
-    table.add_column("Tags", style="yellow")
-
-    for contact_name, note_id, text, tags in results:
-        tags_str = ", ".join(tags)
-        table.add_row(contact_name, str(note_id), text, tags_str)
-
-    return table
+    columns = [
+        ("Contact", {"style": "green"}),
+        ("ID", {"style": "dim", "width": 6}),
+        ("Note", {"style": "white"}),
+        ("Tags", {"style": "yellow"}),
+    ]
+    rows = [(name, str(nid), text, ", ".join(tags))
+            for name, nid, text, tags in results]
+    return show_paginated_table(f"Notes with tag '{tag_query}'", columns, rows)
 
 
 @input_error
@@ -257,17 +257,14 @@ def sort_by_tags(args, book: AddressBook):
     if not results:
         return "No notes with tags found."
 
-    # sort by the first tag alphabetically
     results.sort(key=lambda x: x[3][0].lower())
 
-    table = Table(title="Notes Sorted by Tags", header_style="bold cyan")
-    table.add_column("Contact", style="green")
-    table.add_column("ID", style="dim", width=6)
-    table.add_column("Note", style="white")
-    table.add_column("Tags", style="yellow")
-
-    for contact_name, note_id, text, tags in results:
-        tags_str = ", ".join(tags)
-        table.add_row(contact_name, str(note_id), text, tags_str)
-
-    return table
+    columns = [
+        ("Contact", {"style": "green"}),
+        ("ID", {"style": "dim", "width": 6}),
+        ("Note", {"style": "white"}),
+        ("Tags", {"style": "yellow"}),
+    ]
+    rows = [(name, str(nid), text, ", ".join(tags))
+            for name, nid, text, tags in results]
+    return show_paginated_table("Notes Sorted by Tags", columns, rows)
