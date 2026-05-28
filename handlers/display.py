@@ -16,26 +16,70 @@ def _print(result):
         console.print(result)
 
 
+def paginate(items, page_size=15):
+    """Generator that yields successive page_size-sized chunks from items."""
+    for i in range(0, len(items), page_size):
+        yield items[i : i + page_size]
+
+
+def show_paginated_table(title, columns, rows, page_size=15):
+    """Display a table with automatic pagination when rows exceed page_size.
+
+    columns: list of (header, kwargs) tuples passed to table.add_column
+    rows: list of string tuples passed to table.add_row
+    Returns a Table when no pagination is needed, None when printing directly.
+    """
+    if len(rows) <= page_size:
+        table = Table(title=title, header_style="bold cyan")
+        for header, kwargs in columns:
+            table.add_column(header, **kwargs)
+        for row in rows:
+            table.add_row(*row)
+        return table
+
+    total_pages = (len(rows) + page_size - 1) // page_size
+    for page_num, page_rows in enumerate(paginate(rows, page_size), 1):
+        table = Table(
+            title=f"{title} — page {page_num}/{total_pages}",
+            header_style="bold cyan",
+        )
+        for header, kwargs in columns:
+            table.add_column(header, **kwargs)
+        for row in page_rows:
+            table.add_row(*row)
+        console.print(table)
+
+        if page_num < total_pages:
+            try:
+                choice = input("Press Enter for next page, 'q' to quit: ").strip().lower()
+            except (KeyboardInterrupt, EOFError):
+                break
+            if choice == "q":
+                break
+    return None
+
+
 @input_error
 def display_all(args, book: AddressBook):  # show all contacts as table
     if not book.data:
         return "No contacts saved."
 
-    table = Table(title="Address Book", header_style="bold cyan")
-    table.add_column("Name", style="green")
-    table.add_column("Phones")
-    table.add_column("Birthday")
-    table.add_column("Email")
-    table.add_column("Address")
-
+    columns = [
+        ("Name", {"style": "green"}),
+        ("Phones", {}),
+        ("Birthday", {}),
+        ("Email", {}),
+        ("Address", {}),
+    ]
+    rows = []
     for record in book.data.values():
         phones = "; ".join(str(p) for p in record.phones) or "—"
         birthday = str(record.birthday) if record.birthday else "—"
         email = str(record.email) if record.email else "—"
         address = str(record.address) if record.address else "—"
-        table.add_row(record.name.value, phones, birthday, email, address)
+        rows.append((record.name.value, phones, birthday, email, address))
 
-    return table
+    return show_paginated_table("Address Book", columns, rows)
 
 
 @input_error

@@ -1,6 +1,7 @@
 from decorators import input_error
 from models import AddressBook, Phone, Record, Email, Birthday
 from rich.table import Table
+from handlers.display import show_paginated_table
 import re
 
 
@@ -253,19 +254,20 @@ def find_contact(args, book: AddressBook):  # finding contact by name or phone
                 
     if not found_records:
         return "No contacts found."
-        
-    table = Table(title=f"Search Results for '{args[0]}'", header_style="bold cyan")
-    table.add_column("Name", style="green")
-    table.add_column("Phones")
-    table.add_column("Email")
-    table.add_column("Birthday")
-    table.add_column("Address")
-    
+
+    columns = [
+        ("Name", {"style": "green"}),
+        ("Phones", {}),
+        ("Email", {}),
+        ("Birthday", {}),
+        ("Address", {}),
+    ]
+    rows = []
     for record in found_records:
         phones = "; ".join(p.value for p in record.phones) or "—"
         email = str(record.email) if record.email else "—"
         birthday = str(record.birthday) if record.birthday else "—"
         address = str(record.address) if record.address else "—"
-        table.add_row(record.name.value, phones, email, birthday,address)
-        
-    return table
+        rows.append((record.name.value, phones, email, birthday, address))
+
+    return show_paginated_table(f"Search Results for '{args[0]}'", columns, rows)
