@@ -1,4 +1,4 @@
-from .utils import parse_input, save_data, load_data
+from .utils import parse_input, save_data, load_data, get_validated_command
 from .contact_handlers import (
     add_contact,
     change_contact,

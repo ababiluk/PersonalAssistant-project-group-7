@@ -9,6 +9,7 @@ Install pytest if not already installed:
 
 ```
 pip install pytest
+python3 -m pip install pytest
 ```
 
 ---
