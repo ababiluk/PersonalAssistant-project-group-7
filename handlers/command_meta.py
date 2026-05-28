@@ -23,6 +23,7 @@ COMMAND_META: dict[str, tuple[str, str]] = {
     "add-tag":        ("[name]",               "Add a tag to a contact's note"),
     "find-by-tag":    ("[tag]",                "Search notes by a specific tag"),
     "sort-by-tags":   ("",                    "Show all notes sorted by tags"),
+    "export-book":    ("[csv|json] [path]",   "Export address book to CSV or JSON file"),
     "close":          ("",                    "Quit the bot"),
     "exit":           ("",                    "Quit the bot"),
 }

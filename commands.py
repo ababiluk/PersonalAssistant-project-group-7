@@ -29,6 +29,7 @@ from handlers.note_handlers import (
     find_by_tag,
     sort_by_tags,
 )
+from handlers.export_handlers import export_book
 
 commands = {
     "hello": hello_message,
@@ -54,4 +55,5 @@ commands = {
     "add-tag": add_tag,
     "find-by-tag": find_by_tag,
     "sort-by-tags": sort_by_tags,
+    "export-book": export_book,
 }

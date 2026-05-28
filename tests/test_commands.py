@@ -9,6 +9,8 @@ from unittest.mock import patch
 from rich.table import Table
 
 import ast
+import csv
+import json
 from pathlib import Path
 
 from prompt_toolkit.document import Document
@@ -17,6 +19,9 @@ from models.record import Record
 from models.address_book import AddressBook
 from handlers.command_meta import COMMAND_META
 from handlers.command_hints import CommandCompleter
+from handlers.export_handlers import (
+    export_book, _record_to_dict, _resolve_path, _export_json, _export_csv,
+)
 from handlers.contact_handlers import (
     add_contact, change_contact, delete_contact,
     remove_phone, add_email, find_contact,
@@ -785,3 +790,301 @@ class TestCommandCompleter:
         assert len(completions) == 1
         meta = str(completions[0].display_meta)
         assert "Greet" in meta
+
+
+# =============================================================================
+# Export: helper functions
+# =============================================================================
+
+class TestRecordToDict:
+
+    def _full_record(self):
+        r = Record("Alice")
+        r.add_phone("1234567890")
+        r.add_phone("0987654321")
+        r.add_email("alice@example.com")
+        r.add_birthday("15.06.1990")
+        r.add_address("Kyiv, Main St 1")
+        r.add_note("Buy milk", 1)
+        r.notes[0].add_tag("personal")
+        r.add_note("Work task", 2)
+        return r
+
+    def test_name_exported(self):
+        assert _record_to_dict(Record("Alice"))["name"] == "Alice"
+
+    def test_phones_exported_as_list(self):
+        r = Record("Alice")
+        r.add_phone("1234567890")
+        r.add_phone("0987654321")
+        d = _record_to_dict(r)
+        assert d["phones"] == ["1234567890", "0987654321"]
+
+    def test_email_exported(self):
+        r = Record("Alice")
+        r.add_email("alice@example.com")
+        assert _record_to_dict(r)["email"] == "alice@example.com"
+
+    def test_email_empty_when_not_set(self):
+        assert _record_to_dict(Record("Alice"))["email"] == ""
+
+    def test_birthday_exported_as_string(self):
+        r = Record("Alice")
+        r.add_birthday("15.06.1990")
+        assert _record_to_dict(r)["birthday"] == "15.06.1990"
+
+    def test_birthday_empty_when_not_set(self):
+        assert _record_to_dict(Record("Alice"))["birthday"] == ""
+
+    def test_address_exported(self):
+        r = Record("Alice")
+        r.add_address("Kyiv, Main St 1")
+        assert _record_to_dict(r)["address"] == "Kyiv, Main St 1"
+
+    def test_notes_exported_with_id_text_tags(self):
+        r = Record("Alice")
+        r.add_note("Buy milk", 7)
+        r.notes[0].add_tag("personal")
+        notes = _record_to_dict(r)["notes"]
+        assert len(notes) == 1
+        assert notes[0] == {"id": 7, "text": "Buy milk", "tags": ["personal"]}
+
+    def test_notes_empty_list_when_none(self):
+        assert _record_to_dict(Record("Alice"))["notes"] == []
+
+    def test_full_record_all_fields_present(self):
+        d = _record_to_dict(self._full_record())
+        assert d["name"] == "Alice"
+        assert len(d["phones"]) == 2
+        assert d["email"] == "alice@example.com"
+        assert d["birthday"] == "15.06.1990"
+        assert d["address"] == "Kyiv, Main St 1"
+        assert len(d["notes"]) == 2
+
+
+class TestResolvePath:
+
+    def test_relative_name_gets_extension_added(self, tmp_path):
+        import handlers.export_handlers as eh
+        original = eh.EXPORT_DIR
+        eh.EXPORT_DIR = str(tmp_path)
+        try:
+            result = _resolve_path("myfile", "json")
+            assert result.endswith(".json")
+        finally:
+            eh.EXPORT_DIR = original
+
+    def test_name_with_correct_extension_unchanged(self, tmp_path):
+        import handlers.export_handlers as eh
+        original = eh.EXPORT_DIR
+        eh.EXPORT_DIR = str(tmp_path)
+        try:
+            result = _resolve_path("myfile.json", "json")
+            assert result.endswith("myfile.json")
+        finally:
+            eh.EXPORT_DIR = original
+
+    def test_absolute_path_returned_as_is(self, tmp_path):
+        abs_path = str(tmp_path / "out.json")
+        result = _resolve_path(abs_path, "json")
+        assert result == abs_path
+
+    def test_path_with_separator_returned_as_is(self, tmp_path):
+        path_with_sep = str(tmp_path / "sub" / "out")
+        result = _resolve_path(path_with_sep, "csv")
+        assert path_with_sep + ".csv" == result or result.startswith(str(tmp_path))
+
+
+# =============================================================================
+# Export: JSON output
+# =============================================================================
+
+class TestExportJson:
+
+    def _book(self):
+        book = AddressBook()
+        r = Record("Alice")
+        r.add_phone("1234567890")
+        r.add_email("alice@example.com")
+        r.add_birthday("15.06.1990")
+        r.add_note("Task one", 1)
+        r.notes[0].add_tag("work")
+        book.add_record(r)
+        bob = Record("Bob")
+        bob.add_phone("0987654321")
+        book.add_record(bob)
+        return book
+
+    def test_creates_valid_json_file(self, tmp_path):
+        path = str(tmp_path / "out.json")
+        _export_json(self._book(), path)
+        with open(path, encoding="utf-8") as f:
+            data = json.load(f)
+        assert isinstance(data, list)
+
+    def test_all_contacts_exported(self, tmp_path):
+        path = str(tmp_path / "out.json")
+        _export_json(self._book(), path)
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        names = [r["name"] for r in data]
+        assert "Alice" in names and "Bob" in names
+
+    def test_phones_serialized_as_list(self, tmp_path):
+        path = str(tmp_path / "out.json")
+        _export_json(self._book(), path)
+        alice = next(r for r in json.loads(Path(path).read_text()) if r["name"] == "Alice")
+        assert alice["phones"] == ["1234567890"]
+
+    def test_notes_with_tags_serialized(self, tmp_path):
+        path = str(tmp_path / "out.json")
+        _export_json(self._book(), path)
+        alice = next(r for r in json.loads(Path(path).read_text()) if r["name"] == "Alice")
+        assert alice["notes"][0]["text"] == "Task one"
+        assert alice["notes"][0]["tags"] == ["work"]
+
+    def test_optional_fields_empty_string_when_not_set(self, tmp_path):
+        path = str(tmp_path / "out.json")
+        _export_json(self._book(), path)
+        bob = next(r for r in json.loads(Path(path).read_text()) if r["name"] == "Bob")
+        assert bob["email"] == ""
+        assert bob["birthday"] == ""
+
+    def test_file_is_utf8_encoded(self, tmp_path):
+        book = AddressBook()
+        r = Record("Олексій")
+        r.add_phone("1234567890")
+        book.add_record(r)
+        path = str(tmp_path / "out.json")
+        _export_json(book, path)
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        assert data[0]["name"] == "Олексій"
+
+
+# =============================================================================
+# Export: CSV output
+# =============================================================================
+
+class TestExportCsv:
+
+    def _book_with_notes(self):
+        book = AddressBook()
+        r = Record("Alice")
+        r.add_phone("1234567890")
+        r.add_phone("0987654321")
+        r.add_email("alice@example.com")
+        r.add_note("Task one", 1)
+        r.notes[0].add_tag("work")
+        r.notes[0].add_tag("urgent")
+        r.add_note("Task two", 2)
+        book.add_record(r)
+        bob = Record("Bob")
+        bob.add_phone("1111111111")
+        book.add_record(bob)
+        return book
+
+    def _read_csv(self, path):
+        with open(path, encoding="utf-8", newline="") as f:
+            return list(csv.DictReader(f))
+
+    def test_creates_csv_with_correct_header(self, tmp_path):
+        path = str(tmp_path / "out.csv")
+        _export_csv(_make_book(("Alice", "1234567890")), path)
+        with open(path, encoding="utf-8", newline="") as f:
+            header = next(csv.reader(f))
+        expected = ["name", "phones", "email", "birthday", "address",
+                    "note_id", "note_text", "note_tags"]
+        assert header == expected
+
+    def test_contact_without_notes_writes_one_row(self, tmp_path):
+        path = str(tmp_path / "out.csv")
+        _export_csv(_make_book(("Bob", "1111111111")), path)
+        rows = self._read_csv(path)
+        assert len(rows) == 1
+        assert rows[0]["name"] == "Bob"
+        assert rows[0]["note_text"] == ""
+
+    def test_contact_with_two_notes_writes_two_rows(self, tmp_path):
+        path = str(tmp_path / "out.csv")
+        _export_csv(self._book_with_notes(), path)
+        rows = [r for r in self._read_csv(path) if r["name"] == "Alice"]
+        assert len(rows) == 2
+
+    def test_multiple_phones_joined_with_semicolon(self, tmp_path):
+        path = str(tmp_path / "out.csv")
+        _export_csv(self._book_with_notes(), path)
+        alice_row = next(r for r in self._read_csv(path) if r["name"] == "Alice")
+        assert "1234567890" in alice_row["phones"]
+        assert "0987654321" in alice_row["phones"]
+
+    def test_note_tags_joined_with_semicolon(self, tmp_path):
+        path = str(tmp_path / "out.csv")
+        _export_csv(self._book_with_notes(), path)
+        tagged = next(r for r in self._read_csv(path)
+                      if r["name"] == "Alice" and r["note_text"] == "Task one")
+        assert "work" in tagged["note_tags"]
+        assert "urgent" in tagged["note_tags"]
+
+    def test_note_without_tags_has_empty_tags_field(self, tmp_path):
+        path = str(tmp_path / "out.csv")
+        _export_csv(self._book_with_notes(), path)
+        untagged = next(r for r in self._read_csv(path)
+                        if r["name"] == "Alice" and r["note_text"] == "Task two")
+        assert untagged["note_tags"] == ""
+
+
+# =============================================================================
+# Export: export-book command handler
+# =============================================================================
+
+class TestExportBookCommand:
+
+    def test_empty_book_returns_message(self):
+        result = export_book(["json"], AddressBook())
+        assert "empty" in result.lower()
+
+    def test_missing_format_returns_error(self):
+        book = _make_book(("Alice", "1234567890"))
+        result = export_book([], book)
+        assert "Error" in result
+
+    def test_invalid_format_returns_error(self):
+        book = _make_book(("Alice", "1234567890"))
+        result = export_book(["xml"], book)
+        assert "Error" in result
+
+    def test_export_json_to_custom_path(self, tmp_path):
+        book = _make_book(("Alice", "1234567890"))
+        path = str(tmp_path / "contacts.json")
+        result = export_book(["json", path], book)
+        assert Path(path).exists()
+        assert "Alice" in result or "contacts" in result
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        assert any(r["name"] == "Alice" for r in data)
+
+    def test_export_csv_to_custom_path(self, tmp_path):
+        book = _make_book(("Alice", "1234567890"))
+        path = str(tmp_path / "contacts.csv")
+        result = export_book(["csv", path], book)
+        assert Path(path).exists()
+        rows = list(csv.DictReader(open(path, encoding="utf-8")))
+        assert rows[0]["name"] == "Alice"
+
+    def test_success_message_includes_contact_count(self, tmp_path):
+        book = _make_book(("Alice", "1234567890"), ("Bob", "0987654321"))
+        path = str(tmp_path / "out.json")
+        result = export_book(["json", path], book)
+        assert "2" in result
+
+    def test_custom_path_without_extension_gets_extension_added(self, tmp_path):
+        book = _make_book(("Alice", "1234567890"))
+        path_no_ext = str(tmp_path / "myexport")
+        export_book(["json", path_no_ext], book)
+        assert Path(path_no_ext + ".json").exists()
+
+    def test_export_json_produces_valid_structure(self, tmp_path):
+        book = _make_book(("Alice", "1234567890"))
+        path = str(tmp_path / "out.json")
+        export_book(["json", path], book)
+        data = json.loads(Path(path).read_text(encoding="utf-8"))
+        assert isinstance(data, list)
+        assert set(data[0].keys()) >= {"name", "phones", "email", "birthday", "address", "notes"}
