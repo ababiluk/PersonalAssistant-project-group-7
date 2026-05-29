@@ -143,6 +143,33 @@ def add_email(args, book: AddressBook):  # adding email to existing contact
 
 
 @input_error
+def edit_email(args, book: AddressBook):  # editing email for existing contact
+    if len(args) < 2:
+        return "Error: Usage: edit-email [name] [new_email]"
+    name, new_email = args
+    record = book.find(name)
+    if not record:
+        raise KeyError(name)
+    record.add_email(new_email)  # method add_email usually overwrites the old one
+    return f"Email for '{name}' updated to {new_email}."
+
+
+@input_error
+def delete_email(args, book: AddressBook):  # removing email from contact
+    if not args:
+        return "Error: Usage: delete-email [name]"
+    name = args[0]
+    record = book.find(name)
+    if not record:
+        raise KeyError(name)
+    if not record.email:
+        return f"Contact '{name}' doesn't have an email to delete."
+    
+    record.email = None  # simply clear the field
+    return f"Email for '{name}' deleted."
+
+
+@input_error
 def find_contact(args, book: AddressBook):  # finding contact by name or phone
     search_query = args[0].lower()
     found_records = []
