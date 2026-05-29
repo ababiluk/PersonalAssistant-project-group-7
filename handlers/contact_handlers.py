@@ -2,9 +2,11 @@ from decorators import input_error
 from models import AddressBook, Phone, Record, Email, Birthday
 from rich.table import Table
 from handlers.display import show_paginated_table
+from handlers.exceptions import OperationCancelled, FinishContactInput
 import re
 
 
+# Validate full name: only letters and spaces are allowed
 def _validate_name(name):
     parts = name.split()
     if not parts:
@@ -16,9 +18,15 @@ def _validate_name(name):
     return None
 
 
-def _handle_existing_contact(
-    record, new_phone
-):  # interactive prompt when contact already exists
+# Check if user wants to cancel current operation
+def _check_cancel(value):
+    if value.lower() == "cancel":
+        raise OperationCancelled()
+
+
+# Handle adding a phone to an existing contact
+# Allows user to add a new phone or replace an existing one
+def _handle_existing_contact(record, new_phone):
     print(f"Contact '{record.name.value}' already exists.")
 
     if record.phones:
@@ -26,6 +34,7 @@ def _handle_existing_contact(
 
     print("1 - Add as new phone\n2 - Replace existing phone\n3 - Cancel")
     choice = input("Your choice: ").strip()
+    _check_cancel(choice)
 
     if choice == "1":
         record.add_phone(new_phone)
@@ -40,6 +49,7 @@ def _handle_existing_contact(
             print(f"    [{i}] {p.value}")
 
         idx = input("Number: ").strip()
+        _check_cancel(idx)
         try:
             old_phone = record.phones[int(idx) - 1].value
             record.edit_phone(old_phone, new_phone)
@@ -50,9 +60,12 @@ def _handle_existing_contact(
     return None
 
 
+# Request and validate mandatory contact name
 def _get_mandatory_name():
     while True:
         name_input = input("Enter name and surname: ").strip()
+
+        _check_cancel(name_input)
 
         full_name = name_input.title()
 
@@ -66,9 +79,12 @@ def _get_mandatory_name():
         print(error)
 
 
+# Request and validate mandatory phone number
 def _get_mandatory_phone():
     while True:
         phone = input("Enter phone (10 digits, mandatory): ").strip()
+
+        _check_cancel(phone)
         if not phone:
             print("Error: Phone number is mandatory.")
             continue
@@ -79,10 +95,14 @@ def _get_mandatory_phone():
             print(f"Error: {e}")
 
 
+# Request optional email
+# Returns None if skipped
 def _get_optional_email():
     while True:
         email = input("Enter email (optional): ").strip()
 
+        if email.lower() == "cancel":
+            raise FinishContactInput()
         if not email:
             return None
 
@@ -93,10 +113,14 @@ def _get_optional_email():
             print(f"Error: {e}")
 
 
+# Request optional birthday
+# Returns None if skipped
 def _get_optional_birthday():
     while True:
         birthday = input("Enter birthday (DD.MM.YYYY, optional): ").strip()
 
+        if birthday.lower() == "cancel":
+            raise FinishContactInput()
         if not birthday:
             return None
 
@@ -107,73 +131,113 @@ def _get_optional_birthday():
             print(f"Error: {e}")
 
 
+# Collect address information step by step
+# Save already entered address data if user stops input with 'cancel'
 def _get_address_details():
-    print("Address details:")
+    print( "Address details (type 'cancel' to stop and save entered data):")
     while True:
         country = input("  Enter Country: ").strip()
+        if country.lower() == "cancel":
+            raise FinishContactInput()
         if country:
             break
 
         print("Error: Country is mandatory.")
     while True:
         city = input("  Enter City: ").strip()
+        if city.lower() == "cancel":
+            raise FinishContactInput()
         if city:
             break
 
         print("Error: City is mandatory.")
 
     street = input("  Enter Street: ").strip()
+
+    if street.lower() == "cancel":
+        return ", ".join(filter(None, [country, city]))
+    
+    
     house = input("  Enter House number: ").strip()
 
+    if house.lower() == "cancel":
+        return ", ".join(filter(None, [country, city, street]))
+
     apt = input("  Enter Apartment number (optional): ").strip()
+
+    if apt.lower() == "cancel":
+        return ", ".join(filter(None, [country, city, street, house]))
+    
     zip_code = input("  Enter Zip code (optional): ").strip()
 
+    if zip_code.lower() == "cancel":
+        address_parts = [country, city, street, house]
+
+        if apt:
+            address_parts.append(f"apt. {apt}")
+
+        return ", ".join(filter(None, address_parts))
+    
     address_parts = [country, city, street, house]
+
     if apt:
         address_parts.append(f"apt. {apt}")
+
     if zip_code:
         address_parts.append(zip_code)
 
     return ", ".join(filter(None, address_parts))
 
 
+# Interactive contact creation:
+# 1. Get mandatory data (name, phone)
+# 2. Create or update contact
+# 3. Collect optional data (email, birthday, address)
+# 4. Save entered information
 @input_error
 def add_contact(args, book: AddressBook):
-    full_name = _get_mandatory_name()
+    print("Type 'cancel' at any stage to stop contact creation.")
+    try:
+        full_name = _get_mandatory_name()
 
-    record = book.find(full_name)
+        record = book.find(full_name)
 
-    phone_input = _get_mandatory_phone()
+        phone_input = _get_mandatory_phone()
+        # Find existing contact or create a new one
+        if not record:
+            record = Record(full_name)
+            record.add_phone(phone_input)
+            book.add_record(record)
+            message = f"Contact '{full_name}' created."
+        else:
+            phone_message = _handle_existing_contact(record, phone_input)
 
-    if not record:
-        record = Record(full_name)
-        record.add_phone(phone_input)
-        book.add_record(record)
-        message = f"Contact '{full_name}' created."
-    else:
-        phone_message = _handle_existing_contact(record, phone_input)
+            if phone_message is None:
+                return "Operation cancelled."
+            message = f"Contact '{full_name}' updated. {phone_message}"
+        # Collect optional contact information
+        email = _get_optional_email()
+        if email:
+            record.add_email(email)
+        birthday = _get_optional_birthday()
+        if birthday:
+            record.add_birthday(birthday)
+        address_string = None
 
-        if phone_message is None:
-            return "Operation cancelled."
-        message = f"Contact '{full_name}' updated. {phone_message}"
+        add_address = input("Add address? (y/n): ").strip().lower()
+        # Save address if provided
+        if add_address in ["y", "yes"]:
+            address_string = _get_address_details()
 
-    email = _get_optional_email()
-    birthday = _get_optional_birthday()
-    address_string = None
+        
+        if address_string:
+            record.add_address(address_string)
 
-    add_address = input("Add address? (y/n): ").strip().lower()
-
-    if add_address in ["y", "yes"]:
-        address_string = _get_address_details()
-
-    if email:
-        record.add_email(email)
-    if birthday:
-        record.add_birthday(birthday)
-    if address_string:
-        record.add_address(address_string)
-
-    return f"{message} All details saved."
+        return f"{message} All details saved."
+    except OperationCancelled:
+        return "Operation cancelled."
+    except FinishContactInput:
+        return f"{message} Additional fields skipped."
 
 
 @input_error
@@ -188,7 +252,7 @@ def change_contact(args, book: AddressBook):  # changing existing contact
 
 @input_error
 def show_phone(args, book: AddressBook):  # showing existing contact phones
-    
+
     name = " ".join(args)
     record = book.find(name)
     if not record:
@@ -241,17 +305,17 @@ def add_email(args, book: AddressBook):  # adding email to existing contact
 def find_contact(args, book: AddressBook):  # finding contact by name or phone
     search_query = args[0].lower()
     found_records = []
-    
+
     for record in book.data.values():
         if search_query in record.name.value.lower():
             found_records.append(record)
             continue
-            
+
         for phone in record.phones:
             if search_query in phone.value:
                 found_records.append(record)
                 break
-                
+
     if not found_records:
         return "No contacts found."
 
