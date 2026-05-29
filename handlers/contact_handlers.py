@@ -9,6 +9,8 @@ from handlers.contact_input import (
     _get_address_details,
     _get_optional_birthday,
     _get_optional_email,
+    _get_optional_note,
+    _get_optional_tags,
 )
 import re
 
@@ -20,7 +22,7 @@ import re
 # 4. Save entered information
 @input_error
 def add_contact(args, book: AddressBook):
-    print("Type 'cancel' at any stage to stop contact creation.")
+    print("Type 'cancel' at any stage to finish contact creation and save entered data.")
     try:
         full_name = _get_mandatory_name()
 
@@ -49,11 +51,28 @@ def add_contact(args, book: AddressBook):
         address_string = None
 
         add_address = input("Add address? (y/n): ").strip().lower()
+        if add_address == "cancel":
+            raise FinishContactInput()
         # Save address if provided
         if add_address in ["y", "yes"]:
             address_string = _get_address_details()
             if address_string:
                 record.add_address(address_string)
+
+        note_text = _get_optional_note()
+
+        if note_text:
+            note_id = max(
+                [note.id for r in book.data.values() for note in r.notes],
+                default=0
+            ) + 1
+
+            record.add_note(note_text, note_id)
+
+            tags = _get_optional_tags()
+
+            for tag in tags:
+                record.add_tag_to_note(note_id, tag)
 
         return f"{message} All details saved."
     except OperationCancelled:
@@ -147,6 +166,9 @@ def find_contact(args, book: AddressBook):  # finding contact by name or phone
         ("Email", {}),
         ("Birthday", {}),
         ("Address", {}),
+        ("Notes",{}),
+        ("Tags",{})
+
     ]
     rows = []
     for record in found_records:
@@ -154,6 +176,14 @@ def find_contact(args, book: AddressBook):  # finding contact by name or phone
         email = str(record.email) if record.email else "—"
         birthday = str(record.birthday) if record.birthday else "—"
         address = str(record.address) if record.address else "—"
-        rows.append((record.name.value, phones, email, birthday, address))
+        notes = "; ".join(note.value for note in record.notes) if record.notes else "—"
+
+        tags = "; ".join(
+            tag
+            for note in record.notes
+            for tag in note.tags
+        ) if record.notes else "—"
+        rows.append((record.name.value, phones, email, birthday, address, notes,tags))
+        
 
     return show_paginated_table(f"Search Results for '{args[0]}'", columns, rows)
