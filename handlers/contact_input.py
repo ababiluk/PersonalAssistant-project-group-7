@@ -77,9 +77,7 @@ def _get_optional_email():
 # Returns None if skipped
 def _get_optional_birthday():
     while True:
-        birthday = input(
-            "Enter birthday (DD.MM.YYYY, optional): "
-        ).strip()
+        birthday = input("Enter birthday (DD.MM.YYYY, optional): ").strip()
 
         if birthday.lower() == "cancel":
             raise FinishContactInput()
@@ -96,7 +94,7 @@ def _get_optional_birthday():
 # Collect address information step by step
 # Save already entered address data if user stops input with 'cancel'
 def _get_address_details():
-    print( "Address details (type 'cancel' to stop and save entered data):")
+    print("Address details (type 'cancel' to stop and save entered data):")
     while True:
         country = input("  Enter Country: ").strip()
         if country.lower() == "cancel":
@@ -148,6 +146,29 @@ def _get_address_details():
         address_parts.append(zip_code)
 
     return ", ".join(filter(None, address_parts))
+
+
+# Request optional note
+def _get_optional_note():
+    note = input("Enter note (optional): ").strip()
+
+    if note.lower() == "cancel":
+        raise FinishContactInput()
+
+    return note if note else None
+
+
+# Request optional tags separated by commas
+def _get_optional_tags():
+    tags = input("Enter tags separated by comma (optional): ").strip()
+
+    if tags.lower() == "cancel":
+        raise FinishContactInput()
+
+    if not tags:
+        return []
+
+    return [tag.strip() for tag in tags.split(",") if tag.strip()]
 
 
 # Handle adding a phone to an existing contact
