@@ -1,6 +1,7 @@
 import functools
 
 
+# Handle common command errors and return user-friendly messages
 def input_error(func):
     @functools.wraps(func)
     def inner(*args, **kwargs):

@@ -1,3 +1,4 @@
+# Stores command syntax hints and descriptions for help and autocomplete
 COMMAND_META: dict[str, tuple[str, str]] = {
     #  command           args hint              description
     "hello":          ("",                    "Greet the bot"),

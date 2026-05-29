@@ -15,7 +15,9 @@ _STYLE = Style.from_dict({
 })
 
 
+# Autocomplete commands using metadata descriptions
 class CommandCompleter(Completer):
+    # Generate completion suggestions while user types
     def get_completions(self, document, _complete_event):
         text = document.text_before_cursor.lstrip().lower()
         if " " in text:
@@ -29,7 +31,7 @@ class CommandCompleter(Completer):
                     display_meta=display_meta,
                 )
 
-
+# Create interactive prompt session with history and autocomplete
 def create_session() -> PromptSession:
     return PromptSession(
         history=InMemoryHistory(),
