@@ -134,7 +134,7 @@ def _get_optional_birthday():
 # Collect address information step by step
 # Save already entered address data if user stops input with 'cancel'
 def _get_address_details():
-    print("Address details:")
+    print( "Address details (type 'cancel' to stop and save entered data):")
     while True:
         country = input("  Enter Country: ").strip()
         if country.lower() == "cancel":
@@ -196,6 +196,7 @@ def _get_address_details():
 # 4. Save entered information
 @input_error
 def add_contact(args, book: AddressBook):
+    print("Type 'cancel' at any stage to stop contact creation.")
     try:
         full_name = _get_mandatory_name()
 
