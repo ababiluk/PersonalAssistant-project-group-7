@@ -161,7 +161,9 @@ def show_all(args, book: AddressBook):
 
 @input_error
 def delete_contact(args, book: AddressBook):
-    name = args[0]
+    if not args:
+        return "Error: Usage: delete-contact [name]"
+    name = " ".join(args)
     record = _require_record(book, name)
     book.delete(record.name.value)
     return f"Contact '{name}' deleted."
@@ -169,30 +171,39 @@ def delete_contact(args, book: AddressBook):
 
 @input_error
 def find_contact(args, book: AddressBook):
-    # Match the query as a substring of either the name or any phone number, so
-    # one search covers both ways people look a contact up.
-    search_query = args[0].lower()
-    found_records = []
+    if not args:
+        return "Error: Usage: find-contact [query]"
+    query = " ".join(args).lower().strip()
+    exact = []
+    partial = []
 
     for record in book.data.values():
-        if search_query in record.name.value.lower():
-            found_records.append(record)
+        name_lower = record.name.value.lower()
+        # Exact = the query is the whole name or one of its parts (first/last name).
+        if query == name_lower or query in name_lower.split():
+            exact.append(record)
             continue
+        # Partial = substring of the name or any phone number.
+        if query in name_lower or any(query in p.value for p in record.phones):
+            partial.append(record)
 
-        for phone in record.phones:
-            if search_query in phone.value:
-                found_records.append(record)
-                break
+    # Prefer exact name/surname hits: searching "John" returns John, not Johnson.
+    # Fall back to partial matches only when there's no exact one.
+    found_records = exact or partial
 
     if not found_records:
         return "No contacts found."
 
+    # Show the full record (notes + tags included) so search results carry the
+    # same detail as show-contacts-full.
     columns = [
         ("Name", {"style": "green"}),
         ("Phones", {}),
         ("Email", {}),
         ("Birthday", {}),
         ("Address", {}),
+        ("Notes", {}),
+        ("Tags", {"style": "yellow"}),
     ]
     rows = []
     for record in found_records:
@@ -200,6 +211,16 @@ def find_contact(args, book: AddressBook):
         email = "; ".join(e.value for e in record.emails) or "—"
         birthday = str(record.birthday) if record.birthday else "—"
         address = str(record.address) if record.address else "—"
-        rows.append((record.name.value, phones, email, birthday, address))
 
-    return show_paginated_table(f"Search Results for '{args[0]}'", columns, rows)
+        notes_list = []
+        all_tags = []
+        for note in record.notes:
+            notes_list.append(f"[{note.id}] {note.value}")
+            all_tags.extend(note.tags)
+        notes_text = "\n".join(notes_list) or "—"
+        # dict.fromkeys de-dupes tags across the contact's notes while keeping order.
+        tags_text = ", ".join(dict.fromkeys(all_tags)) or "—"
+
+        rows.append((record.name.value, phones, email, birthday, address, notes_text, tags_text))
+
+    return show_paginated_table(f"Search Results for '{' '.join(args)}'", columns, rows)

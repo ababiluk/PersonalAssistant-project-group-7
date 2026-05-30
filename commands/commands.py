@@ -62,6 +62,7 @@ commands = {
     # Contacts
     "add": add_contact,
     "show-contacts": display_all,
+    "show-contacts-full": all_with_notes,
     "find-contact": find_contact,
     "delete-contact": delete_contact,
 
@@ -94,7 +95,6 @@ commands = {
     "delete-note": delete_note,
     "show-notes": show_notes,
     "show-all-notes": show_all_notes,
-    "show-contacts-full": all_with_notes,
     "find-notes": find_notes,
 
     # Tags

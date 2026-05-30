@@ -1,7 +1,7 @@
 import pickle
 from models import AddressBook
 import difflib
-from handlers.display import show_help, _print
+from handlers.display import command_suggestions_table, _print
 
 
 def parse_input(user_input):
@@ -27,42 +27,19 @@ def load_data(filename="addressbook.pkl"):
         return AddressBook()
 
 
-def get_validated_command(user_command, available_commands, args, book):
-    # Resolve a typed command to a real one, helping past typos.
-    # Accepts the raw command, the list of known commands, and the current
-    # args/book (needed to render help). Returns a valid command name to run, or
-    # None when nothing was chosen. Uses fuzzy matching so a near-miss can be
-    # confirmed or picked from a short list instead of just failing.
+def get_validated_command(user_command, available_commands):
+    # Resolve a typed command to a real one. On a typo we don't auto-run a guess
+    # (it would execute with the args meant for the mistyped command); instead we
+    # show the close matches as a help-style table so the user retypes correctly.
+    # Returns a valid command name to run, or None when there was no exact match.
     if user_command in available_commands:
         return user_command
+
     matches = difflib.get_close_matches(
         user_command, available_commands, n=5, cutoff=0.6
     )
-    if len(matches) == 1:
-        # A single close match: offer it as a yes/no so an obvious typo is one keypress to fix.
-        suggested_command = matches[0]
-        confirm = input(f"Did you mean '{suggested_command}' (y/n)").strip().lower()
-        if confirm in ["y", "yes"]:
-            return suggested_command
-        _print(show_help(args, book))
-    elif len(matches) > 1:
-        # Several candidates: let the user pick by number (or by name) to disambiguate.
-        _print("\nPossible commands:")
-
-        for i, match in enumerate(matches, 1):
-            _print(f"{i}. {match}")
-
-        choice = input("Choose command number (or type 'exit' to cancel): ").strip().lower()
-        if choice in ["exit", "close", "cancel"]:
-            return None
-
-        if choice in matches:
-            return choice
-
-        try:
-            return matches[int(choice) - 1]
-        except (ValueError, IndexError):
-            _print("[red]Invalid selection. Please enter a number from the list.[/red]")
+    if matches:
+        _print(command_suggestions_table(matches))
     else:
         _print(
             "[yellow]Invalid command.[/yellow] "

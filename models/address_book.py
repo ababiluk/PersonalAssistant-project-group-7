@@ -7,11 +7,19 @@ class AddressBook(UserDict):
         self.data[record.name.value] = record
 
     def find(self, name):
-        return self.data.get(name)
+        # Case-insensitive lookup so "john" finds "John". Names are unique
+        # ignoring case (stored title-cased), so the first match is the one.
+        name_lower = name.lower()
+        for record in self.data.values():
+            if record.name.value.lower() == name_lower:
+                return record
+        return None
 
     def delete(self, name):
-        if name in self.data:
-            del self.data[name]
+        # Match find()'s case-insensitivity so deletion works with any casing.
+        record = self.find(name)
+        if record:
+            del self.data[record.name.value]
 
     def get_upcoming_birthdays(self, days=7):
         # Find contacts to congratulate within the next `days` days.

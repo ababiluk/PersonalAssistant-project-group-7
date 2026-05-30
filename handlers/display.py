@@ -1,6 +1,7 @@
 import random
 
 from rich.table import Table
+from rich.markup import escape
 from decorators import input_error
 from models import AddressBook
 from rich.console import Console
@@ -12,7 +13,9 @@ def _print(result):
     # Highlight error strings in red, but pass anything else through untouched so
     # rich renderables (e.g. tables) keep their own formatting.
     if isinstance(result, str) and result.startswith("Error"):
-        console.print(f"[bold red]{result}[/bold red]")
+        # Escape the text so bracketed usage hints like "[name]" aren't swallowed
+        # as rich markup; the [bold red] wrapper still applies.
+        console.print(f"[bold red]{escape(result)}[/bold red]")
     else:
         console.print(result)
 
@@ -85,6 +88,8 @@ def display_all(args, book: AddressBook):
 
 @input_error
 def display_phone(args, book: AddressBook):
+    if not args:
+        return "Error: Usage: show-phone [name]"
     name = " ".join(args)
     record = book.find(name)
     if not record:
@@ -102,17 +107,21 @@ def display_phone(args, book: AddressBook):
 
 @input_error
 def display_birthday(args, book: AddressBook):
-    name = args[0]
+    if not args:
+        return "Error: Usage: show-birthday [name]"
+    name = " ".join(args)
     record = book.find(name)
     if not record:
         raise KeyError(name)
+    # Distinguish "no birthday" from "no such contact" with a clear message
+    # instead of a table showing a bare dash.
+    if not record.birthday:
+        return f"'{name}' has no birthday set."
 
     table = Table(title=f"Birthday: {name}", header_style="bold cyan")
     table.add_column("Name", style="green")
     table.add_column("Birthday")
-
-    birthday = str(record.birthday) if record.birthday else "—"
-    table.add_row(name, birthday)
+    table.add_row(name, str(record.birthday))
 
     return table
 
@@ -124,16 +133,12 @@ def display_birthdays(args, book: AddressBook):
     if not upcoming:
         return f"No birthdays in the next {days} days."
 
-    table = Table(
-        title=f"Upcoming Birthdays (next {days} days)", header_style="bold cyan"
-    )
-    table.add_column("Name", style="green")
-    table.add_column("Congratulation Date")
-
-    for entry in upcoming:
-        table.add_row(entry["name"], entry["congratulation_date"])
-
-    return table
+    columns = [
+        ("Name", {"style": "green"}),
+        ("Congratulation Date", {}),
+    ]
+    rows = [(entry["name"], entry["congratulation_date"]) for entry in upcoming]
+    return show_paginated_table(f"Upcoming Birthdays (next {days} days)", columns, rows)
 
 
 _GREETINGS = [
@@ -200,4 +205,25 @@ def show_help(_args, _book):
             args_escaped = args.replace("[", "\\[")
             table.add_row(f"  {label} {args_escaped}".rstrip(), desc)
 
+    return table
+
+
+def command_suggestions_table(names):
+    # After a typo we show the likely commands as a help-style table (syntax +
+    # description) rather than a numbered picker, so the user reads the correct
+    # usage and retypes it — picking a guess would run it with the wrong args.
+    from commands.meta import COMMAND_META
+
+    table = Table(
+        title="Did you mean one of these?", show_header=True, header_style="bold cyan"
+    )
+    table.add_column("Command", style="green")
+    table.add_column("Description")
+    for name in names:
+        meta = COMMAND_META.get(name)
+        if not meta:
+            continue
+        args, desc, _group = meta
+        args_escaped = args.replace("[", "\\[")
+        table.add_row(f"{name} {args_escaped}".strip(), desc)
     return table

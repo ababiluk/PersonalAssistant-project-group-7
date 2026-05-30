@@ -90,6 +90,7 @@ then waits for input at the `Enter a command:` prompt.
 |---------------------------|-------------------------------------------------------------------|
 | `add [name] [phone]`      | Add by name (+optional phone), or `add` alone for full interactive entry |
 | `show-contacts`           | Show all contacts                                                  |
+| `show-contacts-full`      | Show all contacts with all fields, including notes                |
 | `find-contact [query]`    | Search contacts by name or phone                                  |
 | `delete-contact [name]`   | Delete a contact                                                   |
 
@@ -98,9 +99,9 @@ then waits for input at the `Enter a command:` prompt.
 | Command                       | Description                                          |
 |-------------------------------|------------------------------------------------------|
 | `add-phone [name] [phone]`    | Add a phone to a contact (prompts if no number)      |
-| `edit-phone [name] [old] [new]`| Change a phone number                               |
+| `edit-phone [name]`           | Edit a phone (auto-picks if one, choose if several)  |
 | `show-phone [name]`           | Show phone number(s)                                  |
-| `delete-phone [name] [phone]` | Remove a phone (prompts / auto-picks if no number)   |
+| `delete-phone [name] [phone]` | Remove phone(s) — pick one or many when several      |
 
 ### Emails
 
@@ -108,7 +109,7 @@ then waits for input at the `Enter a command:` prompt.
 |-------------------------------|------------------------------------------------------|
 | `add-email [name] [email]`    | Add an email to a contact (prompts if none given)    |
 | `edit-email [name]`           | Edit an email (choose if several)                    |
-| `delete-email [name] [email]` | Remove an email (prompts / auto-picks if none given) |
+| `delete-email [name] [email]` | Remove email(s) — pick one or many when several      |
 
 ### Birthdays
 
@@ -137,7 +138,6 @@ then waits for input at the `Enter a command:` prompt.
 | `delete-note [name\|id]`| Delete a note (by note ID or contact)                 |
 | `show-notes [name]`     | Show all notes for a contact                           |
 | `show-all-notes`        | Show all notes across all contacts                    |
-| `show-contacts-full`    | Show all contacts with all fields, including notes    |
 | `find-notes [query]`    | Search notes across all contacts                      |
 
 > Commands that take `[name|id]` accept either a note ID or a contact name; if the
@@ -149,7 +149,7 @@ then waits for input at the `Enter a command:` prompt.
 |------------------------|----------------------------------------------------|
 | `add-tag [name\|id]`   | Add one or more comma-separated tags to a note     |
 | `edit-tag [name\|id]`  | Replace a note's whole tag list                    |
-| `delete-tag [name\|id]`| Remove one tag from a note (choose if several)     |
+| `delete-tag [name\|id]`| Remove tag(s) from a note — pick one or many       |
 | `find-by-tag [tag]`    | Search notes by a specific tag                     |
 | `show-notes-by-tag`    | Show all notes grouped by tags                     |
 

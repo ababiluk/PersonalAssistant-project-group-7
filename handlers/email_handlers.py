@@ -4,6 +4,7 @@ from handlers.shared import (
     _require_record,
     _split_name_and_email,
     _choose_from,
+    _choose_many,
     _get_mandatory_email,
 )
 
@@ -42,15 +43,15 @@ def edit_email(args, book: AddressBook):
         if target is None:
             return "Operation cancelled."
 
-    new_email = _get_mandatory_email()
+    new_email = _get_mandatory_email("Enter new email: ")
     record.edit_email(target.value, new_email)
     return f"Email updated to {new_email} for '{name}'."
 
 
 @input_error
 def delete_email(args, book: AddressBook):
-    # Mirrors delete-phone: by name alone we auto-pick a lone email or let the
-    # user choose, otherwise the inline email is removed.
+    # Mirrors delete-phone: an inline email is removed directly; by name alone we
+    # auto-pick a lone email or let the user choose one or many.
     if not args:
         return "Error: Usage: delete-email [name] [optional email]"
     name_parts, email = _split_name_and_email(args)
@@ -60,14 +61,20 @@ def delete_email(args, book: AddressBook):
     if not record.emails:
         return f"Error: '{name}' has no emails."
 
-    if email is None:
-        if len(record.emails) == 1:
-            email = record.emails[0].value
-        else:
-            target = _choose_from(record.emails, lambda e: e.value, "Which email to delete (number): ")
-            if target is None:
-                return "Operation cancelled."
-            email = target.value
+    if email is not None:
+        record.remove_email(email)
+        return f"Email removed from '{name}'."
 
-    record.remove_email(email)
-    return f"Email removed from '{name}'."
+    if len(record.emails) == 1:
+        targets = [record.emails[0]]
+    else:
+        targets = _choose_many(
+            record.emails, lambda e: e.value,
+            "Which email(s) to delete (numbers, comma-separated, or 'all'): ",
+        )
+        if not targets:
+            return "Operation cancelled."
+
+    for target in targets:
+        record.remove_email(target.value)
+    return f"Removed {len(targets)} email(s) from '{name}'."
