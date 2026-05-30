@@ -30,7 +30,7 @@ def add_note(args, book: AddressBook):
     if not args:
         return (
             "Usage: add-note [name] | [text]\n"
-            "Or run without arguments for interactive mode."
+            "Example: add-note John Smith | likes red wine"
         )
 
     full_input = " ".join(args)
@@ -42,7 +42,10 @@ def add_note(args, book: AddressBook):
 
     name = name.strip()
     text = text.strip()
-
+    
+    if not name:
+    return "Error: Contact name cannot be empty."
+  
     if not text:
         return "Error: Note text cannot be empty."
 
