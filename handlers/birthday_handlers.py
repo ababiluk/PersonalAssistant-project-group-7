@@ -1,7 +1,7 @@
 from decorators import input_error
 from models import AddressBook
 
-
+# Add birthday to an existing contact
 @input_error
 def add_birthday(args, book: AddressBook):
     name, bday = args
@@ -11,7 +11,7 @@ def add_birthday(args, book: AddressBook):
     record.add_birthday(bday)
     return "Birthday added."
 
-
+# Show birthday for a specific contact
 @input_error
 def show_birthday(args, book: AddressBook):
     name = args[0]
@@ -22,7 +22,7 @@ def show_birthday(args, book: AddressBook):
         return f"{name} has no birthday set."
     return str(record.birthday)
 
-
+# Show birthdays occurring within the next 7 days
 @input_error
 def birthdays(book: AddressBook):
     upcoming = book.get_upcoming_birthdays()
