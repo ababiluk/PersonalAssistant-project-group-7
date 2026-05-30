@@ -9,6 +9,8 @@ COMMAND_META: dict[str, tuple[str, str]] = {
     "delete-contact": ("[name]",               "Delete a contact"),
     "delete-phone":   ("[name] [phone]",       "Remove a specific phone"),
     "add-email":      ("[name] [email]",       "Add email to a contact"),
+    "edit-email":     ("[name] [new_email]",   "Edit an existing email for a contact"),
+    "delete-email":   ("[name]",               "Delete the email from a contact"),
     "add-birthday":   ("[name] [DD.MM.YYYY]",  "Add birthday"),
     "show-birthday":  ("[name]",               "Show birthday"),
     "birthdays":      ("[days]",               "Upcoming birthdays (default: 7 days)"),
