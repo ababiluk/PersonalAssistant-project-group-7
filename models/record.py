@@ -6,7 +6,7 @@ class Record:
         self.name = Name(name)
         self.phones = []
         self.birthday = None
-        self.email = None
+        self.emails = []
         self.address = None
         self.notes = []
 
@@ -34,8 +34,33 @@ class Record:
     def add_birthday(self, birthday):
         self.birthday = Birthday(birthday)
 
+    def remove_birthday(self):
+        # A contact has at most one birthday, so removal just clears the slot.
+        self.birthday = None
+
+    def remove_address(self):
+        # Address is single-valued; clearing the slot is the whole operation.
+        self.address = None
+
+    # Emails mirror phones (a contact may have several), so they share the same
+    # add/find/remove/edit shape rather than a single overwritten slot.
     def add_email(self, email):
-        self.email = Email(email)
+        self.emails.append(Email(email))
+
+    def find_email(self, email):
+        return next((e for e in self.emails if e.value == email), None)
+
+    def remove_email(self, email):
+        if not self.find_email(email):
+            raise ValueError(f"There is no such email to remove: {email}")
+        self.emails = [e for e in self.emails if e.value != email]
+
+    def edit_email(self, old_email, new_email):
+        email_obj = self.find_email(old_email)
+        if not email_obj:
+            raise ValueError(f"Email {old_email} not found")
+        idx = self.emails.index(email_obj)
+        self.emails[idx] = Email(new_email)
 
     def add_note(self, text, note_id):
         self.notes.append(Note(text, note_id))
@@ -63,7 +88,7 @@ class Record:
 
     def __str__(self):
         birthday = str(self.birthday) if self.birthday else "N/A"
-        email = str(self.email) if self.email else "N/A"
+        email = "; ".join(e.value for e in self.emails) if self.emails else "N/A"
         address = str(self.address) if self.address else "N/A"
 
         phones = "; ".join(p.value for p in self.phones) if self.phones else "No phones"

@@ -12,7 +12,7 @@ def _record_to_dict(record):
     return {
         "name": record.name.value,
         "phones": [p.value for p in record.phones],
-        "email": str(record.email) if record.email else "",
+        "emails": [e.value for e in record.emails],
         "birthday": str(record.birthday) if record.birthday else "",
         "address": str(record.address) if record.address else "",
         "notes": [
@@ -51,7 +51,7 @@ def _export_csv(book, filepath):
             base = {
                 "name": record.name.value,
                 "phones": "; ".join(p.value for p in record.phones),
-                "email": str(record.email) if record.email else "",
+                "email": "; ".join(e.value for e in record.emails),
                 "birthday": str(record.birthday) if record.birthday else "",
                 "address": str(record.address) if record.address else "",
             }

@@ -1,4 +1,4 @@
-from handlers.command_hints import create_session
+from commands.hints import create_session
 from handlers.display import _print, show_help
 from commands import commands
 from handlers import parse_input, save_data, load_data, get_validated_command

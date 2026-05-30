@@ -4,7 +4,6 @@ from rich.table import Table
 from decorators import input_error
 from models import AddressBook
 from rich.console import Console
-from handlers.command_meta import COMMAND_META
 
 console = Console()
 
@@ -75,7 +74,7 @@ def display_all(args, book: AddressBook):  # show all contacts as table
     for record in book.data.values():
         phones = "; ".join(str(p) for p in record.phones) or "—"
         birthday = str(record.birthday) if record.birthday else "—"
-        email = str(record.email) if record.email else "—"
+        email = "; ".join(e.value for e in record.emails) or "—"
         address = str(record.address) if record.address else "—"
         rows.append((record.name.value, phones, birthday, email, address))
 
@@ -162,19 +161,39 @@ def hello_message(_args, _book):  # greeting message from the bot
 
 
 def show_help(_args, _book):
+    # Imported lazily, not at module top: the commands package imports the
+    # handlers, so a top-level import here would form a load-time cycle. By the
+    # time help is invoked the metadata module is fully available.
+    from commands.meta import COMMAND_META, GROUP_ORDER
+
     table = Table(
         title="Available commands", show_header=True, header_style="bold cyan"
     )
     table.add_column("Command", style="green")
     table.add_column("Description")
 
-    for cmd, (args, desc) in COMMAND_META.items():
-        if cmd == "exit":
+    # Group commands by the field/area they serve so related commands sit
+    # together instead of in registration order, which reads as a jumble.
+    grouped = {}
+    for cmd, (args, desc, group) in COMMAND_META.items():
+        grouped.setdefault(group, []).append((cmd, args, desc))
+
+    first_section = True
+    for group in GROUP_ORDER:
+        rows = grouped.get(group)
+        if not rows:
             continue
-        if cmd == "close":
-            table.add_row("close / exit", desc)
-            continue
-        args_escaped = args.replace("[", "\\[")
-        table.add_row(f"{cmd} {args_escaped}".strip(), desc)
+        if not first_section:
+            table.add_section()
+        first_section = False
+        table.add_row(f"[bold yellow]{group}[/bold yellow]", "")
+
+        for cmd, args, desc in rows:
+            # "exit" is folded into the "close" row since they're aliases.
+            if cmd == "exit":
+                continue
+            label = "close / exit" if cmd == "close" else cmd
+            args_escaped = args.replace("[", "\\[")
+            table.add_row(f"  {label} {args_escaped}".rstrip(), desc)
 
     return table

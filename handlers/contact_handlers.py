@@ -1,19 +1,16 @@
 from decorators import input_error
-from models import AddressBook, Phone, Record, Email, Birthday
-from rich.table import Table
+from models import AddressBook, Record
 from handlers.display import show_paginated_table
-import re
-
-
-def _validate_name(name):
-    parts = name.split()
-    if not parts:
-        return "Error: Name is required."
-
-    for part in parts:
-        if not part.isalpha():
-            return f"Error: '{part}' must contain only letters."
-    return None
+from handlers.shared import (
+    _validate_name,
+    _split_name_and_value,
+    _require_record,
+    _get_mandatory_name,
+    _get_mandatory_phone,
+    _get_optional_email,
+    _get_optional_birthday,
+    _get_address_details,
+)
 
 
 def _handle_existing_contact(
@@ -50,93 +47,6 @@ def _handle_existing_contact(
     return None
 
 
-def _get_mandatory_name():
-    while True:
-        name_input = input("Enter name and surname: ").strip()
-
-        full_name = name_input.title()
-
-        if not full_name:
-            print("Error: Name is mandatory.")
-            continue
-
-        error = _validate_name(full_name)
-        if not error:
-            return full_name
-        print(error)
-
-
-def _get_mandatory_phone():
-    while True:
-        phone = input("Enter phone (10 digits, mandatory): ").strip()
-        if not phone:
-            print("Error: Phone number is mandatory.")
-            continue
-        try:
-            Phone(phone)
-            return phone
-        except ValueError as e:
-            print(f"Error: {e}")
-
-
-def _get_optional_email():
-    while True:
-        email = input("Enter email (optional): ").strip()
-
-        if not email:
-            return None
-
-        try:
-            Email(email)
-            return email
-        except ValueError as e:
-            print(f"Error: {e}")
-
-
-def _get_optional_birthday():
-    while True:
-        birthday = input("Enter birthday (DD.MM.YYYY, optional): ").strip()
-
-        if not birthday:
-            return None
-
-        try:
-            Birthday(birthday)
-            return birthday
-        except ValueError as e:
-            print(f"Error: {e}")
-
-
-def _get_address_details():
-    print("Address details:")
-    while True:
-        country = input("  Enter Country: ").strip()
-        if country:
-            break
-
-        print("Error: Country is mandatory.")
-    while True:
-        city = input("  Enter City: ").strip()
-        if city:
-            break
-
-        print("Error: City is mandatory.")
-
-    street = input("  Enter Street: ").strip()
-    house = input("  Enter House number: ").strip()
-
-    apt = input("  Enter Apartment number (optional): ").strip()
-    zip_code = input("  Enter Zip code (optional): ").strip()
-
-    address_parts = [country, city, street, house]
-    if apt:
-        address_parts.append(f"apt. {apt}")
-    if zip_code:
-        address_parts.append(zip_code)
-
-    return ", ".join(filter(None, address_parts))
-
-
 @input_error
 def add_contact(args, book: AddressBook):
     # Two entry styles so users aren't forced through every prompt: passing a
@@ -146,22 +56,12 @@ def add_contact(args, book: AddressBook):
     return _add_contact_interactive(book)
 
 
-def _split_name_and_phone(args):
-    # A name may be several words, so we can't assume a fixed position for the
-    # phone: the trailing token is a phone only when it carries digits (names
-    # never do, since _validate_name forbids them).
-    # Returns (name_parts: list[str], phone: str | None).
-    if len(args) >= 2 and any(ch.isdigit() for ch in args[-1]):
-        return args[:-1], args[-1]
-    return args, None
-
-
 def _add_contact_quick(args, book: AddressBook):
     # One-line entry: a name alone registers someone to flesh out later, and an
     # optional trailing phone makes the contact immediately usable without the
     # full interactive flow.
     # args: tokens after "add"; book: the address book. Returns a status string.
-    name_parts, phone = _split_name_and_phone(args)
+    name_parts, phone = _split_name_and_value(args)
     full_name = " ".join(name_parts).title()
 
     error = _validate_name(full_name)
@@ -226,18 +126,8 @@ def _add_contact_interactive(book: AddressBook):
 
 
 @input_error
-def change_contact(args, book: AddressBook):  # changing existing contact
-    name, old_phone, new_phone = args
-    record = book.find(name)
-    if not record:
-        raise KeyError(name)
-    record.edit_phone(old_phone, new_phone)
-    return "Contact updated."
-
-
-@input_error
 def show_phone(args, book: AddressBook):  # showing existing contact phones
-    
+
     name = " ".join(args)
     record = book.find(name)
     if not record:
@@ -255,52 +145,26 @@ def show_all(args, book: AddressBook):  # show all contacts
 @input_error
 def delete_contact(args, book: AddressBook):  # delete contact from address book
     name = args[0]
-    record = book.find(name)
-    if not record:
-        raise KeyError(name)
-    book.delete(name)
+    record = _require_record(book, name)
+    book.delete(record.name.value)
     return f"Contact '{name}' deleted."
-
-
-@input_error
-def remove_phone(args, book: AddressBook):  # remove specific phone from contact
-    if len(args) < 2:
-        return "Error: Please provide both name and phone."
-    phone = args[-1]
-    name = " ".join(args[:-1])
-    phone_to_delete = re.sub(r"\D", "", phone)[-10:]
-    record = book.find(name)
-    if not record:
-        raise KeyError(name)
-    record.remove_phone(phone_to_delete)
-    return "Phone removed."
-
-
-@input_error
-def add_email(args, book: AddressBook):  # adding email to existing contact
-    name, email = args
-    record = book.find(name)
-    if not record:
-        raise KeyError(name)
-    record.add_email(email)
-    return "Email added."
 
 
 @input_error
 def find_contact(args, book: AddressBook):  # finding contact by name or phone
     search_query = args[0].lower()
     found_records = []
-    
+
     for record in book.data.values():
         if search_query in record.name.value.lower():
             found_records.append(record)
             continue
-            
+
         for phone in record.phones:
             if search_query in phone.value:
                 found_records.append(record)
                 break
-                
+
     if not found_records:
         return "No contacts found."
 
@@ -314,7 +178,7 @@ def find_contact(args, book: AddressBook):  # finding contact by name or phone
     rows = []
     for record in found_records:
         phones = "; ".join(p.value for p in record.phones) or "—"
-        email = str(record.email) if record.email else "—"
+        email = "; ".join(e.value for e in record.emails) or "—"
         birthday = str(record.birthday) if record.birthday else "—"
         address = str(record.address) if record.address else "—"
         rows.append((record.name.value, phones, email, birthday, address))

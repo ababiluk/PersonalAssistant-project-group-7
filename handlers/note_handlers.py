@@ -151,7 +151,7 @@ def all_with_notes(args, book: AddressBook):
     rows = []
     for record in book.data.values():
         phones = "; ".join(p.value for p in record.phones) or "—"
-        email = str(record.email) if record.email else "—"
+        email = "; ".join(e.value for e in record.emails) or "—"
         birthday = str(record.birthday) if record.birthday else "—"
         address = str(record.address) if record.address else "—"
 

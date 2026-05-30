@@ -1,7 +1,6 @@
 import pickle
 from models import AddressBook
 import difflib
-from commands import commands
 from handlers.display import show_help, _print
 
 
@@ -23,14 +22,6 @@ def load_data(filename="addressbook.pkl"):
     except FileNotFoundError:
         return AddressBook()
 
-def suggest_command(user_input): #guess command of user input
-    matches = difflib.get_close_matches(user_input, commands, n=1, cutoff=0.5)
-    
-    if matches:
-        return f"Invalid command. Maybe you meant '{matches}'? Type 'help' for all commands."
-    else:
-        return "Invalid command. Type 'help' for the command list."
-    
 def get_validated_command(user_command, available_commands, args, book):
     if user_command in available_commands:
         return user_command
