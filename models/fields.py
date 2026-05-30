@@ -66,7 +66,31 @@ class Note(Field):
         self.id = note_id
         self.tags = []
 
+    def edit_text(self, new_text):
+        # Edit text in place (instead of rebuilding the Note) so the note keeps
+        # its id and tags; reuse the same non-empty rule as creation.
+        if not new_text.strip():
+            raise ValueError("Note cannot be empty.")
+        self.value = new_text.strip()
+
     def add_tag(self, tag):
         # Skip duplicates so the same tag can't pile up on one note.
         if tag not in self.tags:
             self.tags.append(tag)
+
+    def remove_tag(self, tag):
+        # Raise on a missing tag so the caller reports it instead of silently
+        # doing nothing.
+        if tag not in self.tags:
+            raise ValueError(f"Note #{self.id} has no tag '{tag}'.")
+        self.tags.remove(tag)
+
+    def set_tags(self, tags):
+        # Replace the whole tag list at once (used by edit-tag). De-duplicate and
+        # drop blanks while preserving the given order.
+        cleaned = []
+        for tag in tags:
+            tag = tag.strip()
+            if tag and tag not in cleaned:
+                cleaned.append(tag)
+        self.tags = cleaned

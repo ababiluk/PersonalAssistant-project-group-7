@@ -67,24 +67,10 @@ class Record:
     def add_note(self, text, note_id):
         self.notes.append(Note(text, note_id))
 
-    def edit_note(self, note_id, new_text):
-        for i, note in enumerate(self.notes):
-            if note.id == note_id:
-                self.notes[i] = Note(new_text, note_id)
-                return
-        raise IndexError(f"Note with id {note_id} not found.")
-
     def delete_note(self, note_id):
         for i, note in enumerate(self.notes):
             if note.id == note_id:
                 self.notes.pop(i)
-                return
-        raise IndexError(f"Note with id {note_id} not found.")
-
-    def add_tag_to_note(self, note_id, tag):
-        for note in self.notes:
-            if note.id == note_id:
-                note.add_tag(tag)
                 return
         raise IndexError(f"Note with id {note_id} not found.")
 

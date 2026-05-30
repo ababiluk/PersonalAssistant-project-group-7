@@ -130,23 +130,28 @@ then waits for input at the `Enter a command:` prompt.
 
 ### Notes
 
-| Command                | Description                                          |
-|------------------------|------------------------------------------------------|
-| `add-note [name] [text]`| Add a note to a contact                             |
-| `edit-note [name]`     | Edit a note by ID                                    |
-| `delete-note [name]`   | Delete a note by ID                                  |
-| `show-notes [name]`    | Show all notes for a contact                         |
-| `show-all-notes`       | Show all notes across all contacts                   |
-| `show-contacts-full`   | Show all contacts with all fields, including notes   |
-| `find-notes [query]`   | Search notes across all contacts                     |
+| Command                 | Description                                           |
+|-------------------------|-------------------------------------------------------|
+| `add-note [name] [text]`| Add a note to a contact                               |
+| `edit-note [name\|id]`  | Edit a note's text (by note ID or contact; tags kept) |
+| `delete-note [name\|id]`| Delete a note (by note ID or contact)                 |
+| `show-notes [name]`     | Show all notes for a contact                           |
+| `show-all-notes`        | Show all notes across all contacts                    |
+| `show-contacts-full`    | Show all contacts with all fields, including notes    |
+| `find-notes [query]`    | Search notes across all contacts                      |
+
+> Commands that take `[name|id]` accept either a note ID or a contact name; if the
+> contact has several notes you'll be asked which one.
 
 ### Tags
 
-| Command                | Description                       |
-|------------------------|-----------------------------------|
-| `add-tag [name]`       | Add a tag to a contact's note     |
-| `find-by-tag [tag]`    | Search notes by a specific tag    |
-| `show-notes-by-tag`    | Show all notes grouped by tags    |
+| Command                | Description                                        |
+|------------------------|----------------------------------------------------|
+| `add-tag [name\|id]`   | Add one or more comma-separated tags to a note     |
+| `edit-tag [name\|id]`  | Replace a note's whole tag list                    |
+| `delete-tag [name\|id]`| Remove one tag from a note (choose if several)     |
+| `find-by-tag [tag]`    | Search notes by a specific tag                     |
+| `show-notes-by-tag`    | Show all notes grouped by tags                     |
 
 ### Data
 

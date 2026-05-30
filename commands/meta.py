@@ -49,14 +49,16 @@ COMMAND_META: dict[str, tuple[str, str, str]] = {
     "delete-address": ("[name]",               "Remove the address",                                 "Addresses"),
 
     "add-note":       ("[name] [text]",        "Add a note to a contact",                            "Notes"),
-    "edit-note":      ("[name]",               "Edit a note by ID",                                  "Notes"),
-    "delete-note":    ("[name]",               "Delete a note by ID",                                "Notes"),
+    "edit-note":      ("[name|id]",            "Edit a note's text (by note id or contact)",         "Notes"),
+    "delete-note":    ("[name|id]",            "Delete a note (by note id or contact)",              "Notes"),
     "show-notes":     ("[name]",               "Show all notes for a contact",                       "Notes"),
     "show-all-notes": ("",                    "Show all notes across all contacts",                 "Notes"),
     "show-contacts-full": ("",                "Show all contacts with all fields including notes",  "Notes"),
     "find-notes":     ("[query]",              "Search notes across all contacts",                   "Notes"),
 
-    "add-tag":        ("[name]",               "Add a tag to a contact's note",                      "Tags"),
+    "add-tag":        ("[name|id]",            "Add tag(s) to a note, comma-separated",              "Tags"),
+    "edit-tag":       ("[name|id]",            "Replace a note's whole tag list",                    "Tags"),
+    "delete-tag":     ("[name|id]",            "Remove one tag from a note (choose if several)",     "Tags"),
     "find-by-tag":    ("[tag]",                "Search notes by a specific tag",                     "Tags"),
     "show-notes-by-tag":("",                   "Show all notes grouped by tags",                     "Tags"),
 

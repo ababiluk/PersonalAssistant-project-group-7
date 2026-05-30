@@ -1,10 +1,8 @@
 from decorators import input_error
 from models import AddressBook
 from rich.table import Table
-from rich.console import Console
 from handlers.display import show_paginated_table
-
-console = Console()
+from handlers.shared import _require_record, _choose_from
 
 
 def _next_note_id(book):
@@ -14,27 +12,49 @@ def _next_note_id(book):
     return max(all_ids, default=0) + 1
 
 
-def _print_notes_table(record):
-    table = Table(header_style="bold cyan")
-    table.add_column("ID", style="dim", width=6)
-    table.add_column("Note", style="white")
-    table.add_column("Tags", style="yellow")
-    for note in record.notes:
-        tags_str = ", ".join(note.tags) if note.tags else "—"
-        table.add_row(str(note.id), note.value, tags_str)
-    console.print(table)
+def _parse_tags(raw):
+    # Split a comma-separated entry so several tags can be added at once; trims
+    # blanks (the model also de-dupes).
+    return [tag.strip() for tag in raw.split(",") if tag.strip()]
+
+
+def _resolve_note(book, args):
+    # Resolve which note a command targets so edit/delete/tag commands share one
+    # rule: a numeric arg is a note ID (searched across the whole book); anything
+    # else is a contact name, and when that contact has several notes the user
+    # picks one. Returns (record, note), or (None, None) if the user cancels the
+    # pick. Raises ValueError (-> friendly message) when the id/name/notes are missing.
+    token = " ".join(args).strip()
+    if token.isdigit():
+        note_id = int(token)
+        for record in book.data.values():
+            for note in record.notes:
+                if note.id == note_id:
+                    return record, note
+        raise ValueError(f"No note with ID {note_id}.")
+
+    record = _require_record(book, token)
+    if not record.notes:
+        raise ValueError(f"'{token}' has no notes.")
+    if len(record.notes) == 1:
+        return record, record.notes[0]
+
+    note = _choose_from(
+        record.notes,
+        lambda n: f"#{n.id} {n.value}",
+        "Which note (number): ",
+    )
+    if note is None:
+        return None, None
+    return record, note
 
 
 @input_error
 def add_note(args, book: AddressBook):
-    if not args:
-        return "Error: Usage: add-note [name] [text]"
-    name = args[0]
-    record = book.find(name)
-    if not record:
-        return f"Error: Contact '{name}' not found."
     if len(args) < 2:
         return "Error: Usage: add-note [name] [text]"
+    name = args[0]
+    record = _require_record(book, name)
     text = " ".join(args[1:])
     note_id = _next_note_id(book)
     record.add_note(text, note_id)
@@ -44,83 +64,86 @@ def add_note(args, book: AddressBook):
 @input_error
 def edit_note(args, book: AddressBook):
     if not args:
-        return "Error: Usage: edit-note [name]"
-    name = args[0]
-    record = book.find(name)
-    if not record:
-        return f"Error: Contact '{name}' not found."
-    if not record.notes:
-        return f"Error: '{name}' has no notes."
-
-    _print_notes_table(record)
-    try:
-        note_id = int(input("Enter note ID to edit: ").strip())
-    except ValueError:
-        return "Error: ID must be a number."
-    new_text = input("Enter new text: ").strip()
-    if not new_text:
-        return "Error: Note text cannot be empty."
-    record.edit_note(note_id, new_text)
-    return f"Note #{note_id} updated."
+        return "Error: Usage: edit-note [contact name | note id]"
+    record, note = _resolve_note(book, args)
+    if note is None:
+        return "Operation cancelled."
+    # edit_text keeps the note's id and tags (a previous bug rebuilt the note and
+    # dropped its tags); the empty-text check lives in the model.
+    note.edit_text(input("Enter new text: ").strip())
+    return f"Note #{note.id} updated."
 
 
 @input_error
 def delete_note(args, book: AddressBook):
     if not args:
-        return "Error: Usage: delete-note [name]"
-    name = args[0]
-    record = book.find(name)
-    if not record:
-        return f"Error: Contact '{name}' not found."
-    if not record.notes:
-        return f"Error: '{name}' has no notes."
-
-    _print_notes_table(record)
-    try:
-        note_id = int(input("Enter note ID to delete: ").strip())
-    except ValueError:
-        return "Error: ID must be a number."
-    record.delete_note(note_id)
-    return f"Note #{note_id} deleted."
+        return "Error: Usage: delete-note [contact name | note id]"
+    record, note = _resolve_note(book, args)
+    if note is None:
+        return "Operation cancelled."
+    record.delete_note(note.id)
+    return f"Note #{note.id} deleted."
 
 
 @input_error
 def add_tag(args, book: AddressBook):
     if not args:
-        return "Error: Usage: add-tag [name]"
-    name = args[0]
-    record = book.find(name)
-    if not record:
-        return f"Error: Contact '{name}' not found."
-    if not record.notes:
-        return f"Error: '{name}' has no notes."
+        return "Error: Usage: add-tag [contact name | note id]"
+    record, note = _resolve_note(book, args)
+    if note is None:
+        return "Operation cancelled."
+    tags = _parse_tags(input("Enter tag(s), comma-separated: ").strip())
+    if not tags:
+        return "Error: No tags entered."
+    for tag in tags:
+        note.add_tag(tag)
+    return f"Note #{note.id} tags: {', '.join(note.tags)}."
 
-    _print_notes_table(record)
-    try:
-        note_id = int(input("Enter note ID to add a tag: ").strip())
-    except ValueError:
-        return "Error: ID must be a number."
-        
-    tag = input("Enter tag (e.g. work, important): ").strip()
-    if not tag:
-        return "Error: Tag cannot be empty."
-        
-    try:
-        record.add_tag_to_note(note_id, tag)
-    except IndexError as e:
-        return f"Error: {e}"
-        
-    return f"Tag '{tag}' added to note #{note_id}."
+
+@input_error
+def edit_tag(args, book: AddressBook):
+    # Edit-tag replaces the whole tag list at once (not a single tag) so the user
+    # can re-state a note's tags in one go.
+    if not args:
+        return "Error: Usage: edit-tag [contact name | note id]"
+    record, note = _resolve_note(book, args)
+    if note is None:
+        return "Operation cancelled."
+    current = ", ".join(note.tags) if note.tags else "—"
+    print(f"Current tags for note #{note.id}: {current}")
+    note.set_tags(_parse_tags(input("New tag list, comma-separated (blank to clear): ").strip()))
+    updated = ", ".join(note.tags) if note.tags else "—"
+    return f"Note #{note.id} tags updated to: {updated}."
+
+
+@input_error
+def delete_tag(args, book: AddressBook):
+    # Delete-tag removes one specific tag; with several tags the user picks which.
+    if not args:
+        return "Error: Usage: delete-tag [contact name | note id]"
+    record, note = _resolve_note(book, args)
+    if note is None:
+        return "Operation cancelled."
+    if not note.tags:
+        return f"Error: note #{note.id} has no tags."
+
+    if len(note.tags) == 1:
+        tag = note.tags[0]
+    else:
+        tag = _choose_from(note.tags, lambda t: t, "Which tag to delete (number): ")
+        if tag is None:
+            return "Operation cancelled."
+
+    note.remove_tag(tag)
+    return f"Tag '{tag}' removed from note #{note.id}."
 
 
 @input_error
 def show_notes(args, book: AddressBook):
     if not args:
         return "Error: Usage: show-notes [name]"
-    name = args[0]
-    record = book.find(name)
-    if not record:
-        return f"Error: Contact '{name}' not found."
+    name = " ".join(args)
+    record = _require_record(book, name)
     if not record.notes:
         return f"No notes for '{name}'."
 
@@ -128,7 +151,7 @@ def show_notes(args, book: AddressBook):
     table.add_column("ID", style="dim", width=6)
     table.add_column("Note", style="white")
     table.add_column("Tags", style="yellow")
-    
+
     for note in record.notes:
         tags_str = ", ".join(note.tags) if note.tags else "—"
         table.add_row(str(note.id), note.value, tags_str)
@@ -163,6 +186,7 @@ def all_with_notes(args, book: AddressBook):
             all_tags.extend(n.tags)
 
         notes_text = "\n".join(notes_list) or "—"
+        # dict.fromkeys de-dupes tags across the contact's notes while keeping order.
         tags_text = ", ".join(dict.fromkeys(all_tags)) or "—"
         rows.append((record.name.value, phones, email, birthday, address, notes_text, tags_text))
 
@@ -201,7 +225,7 @@ def find_notes(args, book: AddressBook):
             # Match against both text and tags so a tag-only hit still surfaces the note.
             in_text = query in note.value.lower()
             in_tags = any(query == t.lower() for t in note.tags)
-            
+
             if in_text or in_tags:
                 results.append((record.name.value, note.id, note.value, note.tags))
 

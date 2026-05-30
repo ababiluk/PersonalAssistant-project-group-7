@@ -47,6 +47,8 @@ from handlers.note_handlers import (
     find_notes,
     all_with_notes,
     add_tag,
+    edit_tag,
+    delete_tag,
     find_by_tag,
     sort_by_tags,
 )
@@ -97,6 +99,8 @@ commands = {
 
     # Tags
     "add-tag": add_tag,
+    "edit-tag": edit_tag,
+    "delete-tag": delete_tag,
     "find-by-tag": find_by_tag,
     "show-notes-by-tag": sort_by_tags,
 
