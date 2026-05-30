@@ -7,6 +7,7 @@ from handlers.contact_handlers import (
     add_email,
     edit_email,
     delete_email,
+    rename_contact,
 )
 from handlers.birthday_handlers import (
     add_birthday,
@@ -23,11 +24,15 @@ from handlers.note_handlers import (
     add_note,
     edit_note,
     delete_note,
+    add_tag,
+)
+from handlers.note_display import (
     show_notes,
     show_all_notes,
-    find_notes,
     all_with_notes,
-    add_tag,
+)
+from handlers.note_search import (
+    find_notes,
     find_by_tag,
     sort_by_tags,
 )
@@ -40,6 +45,7 @@ commands = {
     "change": change_contact,
     "phone": display_phone,
     "all": display_all,
+    "rename-contact": rename_contact,
     "delete-contact": delete_contact,
     "delete-phone": remove_phone,
     "add-birthday": add_birthday,

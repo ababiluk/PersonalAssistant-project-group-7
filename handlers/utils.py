@@ -1,21 +1,25 @@
-import pickle
-from models import AddressBook
 import difflib
-from commands import commands
+import pickle
+
+from models import AddressBook
 from handlers.display import show_help, _print
 
 
+# Parse user input into command and arguments
 def parse_input(user_input):
     cmd, *args = user_input.split()
     cmd = cmd.strip().lower()
     return cmd, *args
 
 
+# Save address book data to a file
 def save_data(book, filename="addressbook.pkl"):
     with open(filename, "wb") as f:
         pickle.dump(book, f)
 
 
+# Load address book data from a file
+# Create a new address book if file does not exist
 def load_data(filename="addressbook.pkl"):
     try:
         with open(filename, "rb") as f:
@@ -23,14 +27,8 @@ def load_data(filename="addressbook.pkl"):
     except FileNotFoundError:
         return AddressBook()
 
-def suggest_command(user_input): #guess command of user input
-    matches = difflib.get_close_matches(user_input, commands, n=1, cutoff=0.5)
-    
-    if matches:
-        return f"Invalid command. Maybe you meant '{matches}'? Type 'help' for all commands."
-    else:
-        return "Invalid command. Type 'help' for the command list."
-    
+
+# Validate command and suggest alternatives if needed
 def get_validated_command(user_command, available_commands, args, book):
     if user_command in available_commands:
         return user_command
@@ -49,10 +47,12 @@ def get_validated_command(user_command, available_commands, args, book):
         for i, match in enumerate(matches, 1):
             _print(f"{i}. {match}")
 
-        choice = input("Choose command number (or type 'exit' to cancel): ").strip().lower()
+        choice = (
+            input("Choose command number (or type 'exit' to cancel): ").strip().lower()
+        )
         if choice in ["exit", "close", "cancel"]:
             return None
-        
+
         if choice in matches:
             return choice
 

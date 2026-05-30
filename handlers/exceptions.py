@@ -3,4 +3,5 @@ class OperationCancelled(Exception):
     pass
 
 class FinishContactInput(Exception):
+    """Stop optional contact input and save entered data."""
     pass
