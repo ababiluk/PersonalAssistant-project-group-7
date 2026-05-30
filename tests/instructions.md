@@ -53,8 +53,8 @@ Other useful flags:
 
 | File | What it covers |
 |---|---|
-| `test_fields.py` | Field-level validation: `Phone`, `Birthday`, `Email`, `Note`, `Name`, `Address` |
-| `test_commands.py` | `Record` and `AddressBook` models, all 23 command handlers, input parsing, persistence |
+| `test_fields.py` | Field-level validation: `Phone`, `Birthday`, `Email`, `Note`, `Name`, `Address` (incl. the new `Name`/`Address`/future-`Birthday` rules) |
+| `test_commands.py` | `Record` and `AddressBook` models, every registered command handler (contacts / phones / emails / birthdays / addresses / notes / tags / display / export), input parsing, command validation, persistence, and the `COMMAND_META` / completer contract |
 | `test_e2e.py` | Full session: empty book -> add contacts -> all commands -> save/reload |
 
 ---
@@ -74,11 +74,12 @@ xpassed  — test unexpectedly passed (bug was fixed — remove the xfail marker
 | Test | Bug |
 |---|---|
 | `TestPhoneField::test_plus_prefix_rejected` | `Phone("+1234567890")` strips `+` and accepts the number |
-| `TestPhoneField::test_unicode_arabic_digits_rejected` | `isdigit()` accepts Arabic-Indic digits |
+| `TestPhoneField::test_unicode_arabic_digits_rejected` | `re.sub(r"\D")` keeps Unicode digits, so Arabic-Indic digits are accepted |
 | `TestBirthdayField::test_no_leading_zero_rejected` | `Birthday("1.1.2000")` accepted without leading zeros |
-| `TestNoteCommands::test_edit_note_preserves_tags` | `edit_note` replaces the `Note` object, losing all tags |
-| `TestNameField::test_empty_name_raises` | `Name("")` accepted — no field-level validation |
-| `TestNameField::test_whitespace_only_name_raises` | `Name("   ")` accepted — no field-level validation |
-| `TestNameField::test_non_letter_name_raises` | `Name("Alice123")` accepted — no field-level validation |
-| `TestAddressField::test_empty_address_raises` | `Address("")` accepted — no field-level validation |
-| `TestAddressField::test_whitespace_only_address_raises` | `Address("   ")` accepted — no field-level validation |
+
+> Several earlier bugs have since been fixed in the source and are now covered by
+> ordinary passing tests (no longer `xfail`): the `Name`/`Address` validation
+> gaps, the `edit_note` tag-loss bug, the Feb-29 crash in
+> `get_upcoming_birthdays`, the `cancel`-at-mandatory-prompt crash in the
+> interactive `add` / `add-phone` / `edit-phone` / `add-email` / `edit-email`
+> flows, and `add-note` not accepting multi-word contact names.

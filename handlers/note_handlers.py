@@ -74,12 +74,21 @@ def _resolve_note(book, args):
 def add_note(args, book: AddressBook):
     if len(args) < 2:
         return "Error: Usage: add-note [name] [text]"
-    name = args[0]
-    record = _require_record(book, name)
-    text = " ".join(args[1:])
+    # Names may be several words, so match the longest leading run of args that is
+    # an existing contact; whatever follows is the note text. (At least one arg is
+    # always left over for the text because the loop stops before consuming all.)
+    record, split_at = None, 0
+    for i in range(len(args) - 1, 0, -1):
+        found = book.find(" ".join(args[:i]))
+        if found:
+            record, split_at = found, i
+            break
+    if record is None:
+        raise KeyError(args[0])
+    text = " ".join(args[split_at:])
     note_id = _next_note_id(book)
     record.add_note(text, note_id)
-    return f"Note #{note_id} added to '{name}'."
+    return f"Note #{note_id} added to '{record.name.value}'."
 
 
 @input_error
