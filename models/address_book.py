@@ -3,21 +3,21 @@ from datetime import date, timedelta
 
 
 class AddressBook(UserDict):
-    # Add a new contact record to the address book
     def add_record(self, record):
         self.data[record.name.value] = record
 
-    # Find a contact by name
     def find(self, name):
         return self.data.get(name)
 
-    # Delete a contact from the address book
     def delete(self, name):
         if name in self.data:
             del self.data[name]
 
-    # Return birthdays occurring within the specified number of days
     def get_upcoming_birthdays(self, days=7):
+        # Find contacts to congratulate within the next `days` days.
+        # Accepts the look-ahead window in days. Returns a list of
+        # {"name", "congratulation_date" (DD.MM.YYYY)} dicts, where birthdays
+        # landing on a weekend are moved to the following Monday.
         today = date.today()
         upcoming = []
 
@@ -25,16 +25,17 @@ class AddressBook(UserDict):
             if not record.birthday:
                 continue
 
-            birthday_this_year = record.birthday.value.replace(
-                year=today.year
-            )  # changing year to current to compare only days
+            # Compare on this year's date so only month/day matter, not the year born.
+            birthday_this_year = record.birthday.value.replace(year=today.year)
 
-            if birthday_this_year < today:  # moving past birthdays to next year
+            # Already passed this year -> the next occurrence is next year.
+            if birthday_this_year < today:
                 birthday_this_year = birthday_this_year.replace(year=today.year + 1)
 
-            days_until = (birthday_this_year - today).days  # main calculation
+            days_until = (birthday_this_year - today).days
 
-            if 0 <= days_until <= days:  # weekends checks
+            if 0 <= days_until <= days:
+                # Weekend birthdays are greeted on the next working day (Monday).
                 if birthday_this_year.weekday() == 5:
                     congrats_date = birthday_this_year + timedelta(days=2)
                 elif birthday_this_year.weekday() == 6:
@@ -42,25 +43,9 @@ class AddressBook(UserDict):
                 else:
                     congrats_date = birthday_this_year
 
-                upcoming.append(
-                    {
-                        "name": record.name.value,
-                        "congratulation_date": congrats_date.strftime("%d.%m.%Y"),
-                    }
-                )
+                upcoming.append({
+                    "name": record.name.value,
+                    "congratulation_date": congrats_date.strftime("%d.%m.%Y"),
+                })
 
         return upcoming
-    # Rename contact and update dictionary key
-    def rename_contact(self, old_name, new_name):
-        record = self.find(old_name)
-
-        if not record:
-            raise KeyError(old_name)
-
-        if new_name in self.data:
-            raise ValueError(f"Contact '{new_name}' already exists.")
-
-        record.edit_name(new_name)
-
-        self.data[new_name] = record
-        del self.data[old_name]

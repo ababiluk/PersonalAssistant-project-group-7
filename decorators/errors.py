@@ -3,6 +3,9 @@ import functools
 
 # Handle common command errors and return user-friendly messages
 def input_error(func):
+    # Wrap command handlers so expected user mistakes become a returned message
+    # instead of a traceback that would crash the REPL loop. Each exception type
+    # maps to the typical cause: bad value, unknown contact, missing argument.
     @functools.wraps(func)
     def inner(*args, **kwargs):
         try:

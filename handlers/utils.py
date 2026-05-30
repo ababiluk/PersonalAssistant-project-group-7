@@ -1,55 +1,58 @@
-import difflib
 import pickle
-
 from models import AddressBook
+import difflib
 from handlers.display import show_help, _print
 
 
-# Parse user input into command and arguments
 def parse_input(user_input):
+    # Lower-case the command so input is case-insensitive, but leave args as-is
+    # (names/values may be case-sensitive).
     cmd, *args = user_input.split()
     cmd = cmd.strip().lower()
     return cmd, *args
 
 
-# Save address book data to a file
 def save_data(book, filename="addressbook.pkl"):
     with open(filename, "wb") as f:
         pickle.dump(book, f)
 
 
-# Load address book data from a file
-# Create a new address book if file does not exist
 def load_data(filename="addressbook.pkl"):
     try:
         with open(filename, "rb") as f:
             return pickle.load(f)
     except FileNotFoundError:
+        # First run (or moved/cleared data): start with an empty book rather
+        # than crashing, so the app is usable out of the box.
         return AddressBook()
 
 
-# Validate command and suggest alternatives if needed
 def get_validated_command(user_command, available_commands, args, book):
+    # Resolve a typed command to a real one, helping past typos.
+    # Accepts the raw command, the list of known commands, and the current
+    # args/book (needed to render help). Returns a valid command name to run, or
+    # None when nothing was chosen. Uses fuzzy matching so a near-miss can be
+    # confirmed or picked from a short list instead of just failing.
     if user_command in available_commands:
         return user_command
     matches = difflib.get_close_matches(
         user_command, available_commands, n=5, cutoff=0.6
     )
     if len(matches) == 1:
+        # A single close match: offer it as a yes/no so an obvious typo is one keypress to fix.
         suggested_command = matches[0]
         confirm = input(f"Did you mean '{suggested_command}' (y/n)").strip().lower()
         if confirm in ["y", "yes"]:
             return suggested_command
         _print(show_help(args, book))
     elif len(matches) > 1:
+        # Several candidates: let the user pick by number (or by name) to disambiguate.
         _print("\nPossible commands:")
 
         for i, match in enumerate(matches, 1):
             _print(f"{i}. {match}")
 
-        choice = (
-            input("Choose command number (or type 'exit' to cancel): ").strip().lower()
-        )
+        choice = input("Choose command number (or type 'exit' to cancel): ").strip().lower()
         if choice in ["exit", "close", "cancel"]:
             return None
 

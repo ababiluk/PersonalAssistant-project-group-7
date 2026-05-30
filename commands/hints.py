@@ -2,7 +2,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.styles import Style
-from handlers.command_meta import COMMAND_META
+from commands.meta import COMMAND_META
 
 _STYLE = Style.from_dict({
     "completion-menu":                    "bg:#1e1e2e",
@@ -20,9 +20,11 @@ class CommandCompleter(Completer):
     # Generate completion suggestions while user types
     def get_completions(self, document, _complete_event):
         text = document.text_before_cursor.lstrip().lower()
+        # Only complete the command word itself; once the user types a space they
+        # are entering arguments, which we can't meaningfully suggest.
         if " " in text:
             return
-        for cmd, (args, desc) in COMMAND_META.items():
+        for cmd, (args, desc, _group) in COMMAND_META.items():
             if cmd.startswith(text):
                 display_meta = f"{args} — {desc}" if args else desc
                 yield Completion(

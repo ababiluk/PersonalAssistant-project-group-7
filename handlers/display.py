@@ -4,34 +4,32 @@ from rich.table import Table
 from decorators import input_error
 from models import AddressBook
 from rich.console import Console
-from handlers.command_meta import COMMAND_META
 
 console = Console()
 
 
-# Display results in red if they contain an error message
 def _print(result):
+    # Highlight error strings in red, but pass anything else through untouched so
+    # rich renderables (e.g. tables) keep their own formatting.
     if isinstance(result, str) and result.startswith("Error"):
         console.print(f"[bold red]{result}[/bold red]")
     else:
         console.print(result)
 
 
-# Split a list into pages of fixed size
 def paginate(items, page_size=15):
-    """Generator that yields successive page_size-sized chunks from items."""
+    # Yield successive page_size-sized chunks so large tables can be shown one
+    # page at a time instead of flooding the console.
     for i in range(0, len(items), page_size):
         yield items[i : i + page_size]
 
 
-# Display large tables page by page
 def show_paginated_table(title, columns, rows, page_size=15):
-    """Display a table with automatic pagination when rows exceed page_size.
-
-    columns: list of (header, kwargs) tuples passed to table.add_column
-    rows: list of string tuples passed to table.add_row
-    Returns a Table when no pagination is needed, None when printing directly.
-    """
+    # Paginate only when needed: small results are returned as a Table for the
+    # caller to print, while long lists are printed here page by page so they
+    # don't scroll off-screen.
+    # columns: list of (header, kwargs) for add_column; rows: list of string tuples.
+    # Returns a Table when it fits on one page, or None when it paginated itself.
     if len(rows) <= page_size:
         table = Table(title=title, header_style="bold cyan")
         for header, kwargs in columns:
@@ -54,18 +52,16 @@ def show_paginated_table(title, columns, rows, page_size=15):
 
         if page_num < total_pages:
             try:
-                choice = (
-                    input("Press Enter for next page, 'q' to quit: ").strip().lower()
-                )
+                choice = input("Press Enter for next page, 'q' to quit: ").strip().lower()
             except (KeyboardInterrupt, EOFError):
                 break
             if choice == "q":
                 break
     return None
 
-# Show all contacts as table
+
 @input_error
-def display_all(args, book: AddressBook):  
+def display_all(args, book: AddressBook):
     if not book.data:
         return "No contacts saved."
 
@@ -80,15 +76,15 @@ def display_all(args, book: AddressBook):
     for record in book.data.values():
         phones = "; ".join(str(p) for p in record.phones) or "—"
         birthday = str(record.birthday) if record.birthday else "—"
-        email = str(record.email) if record.email else "—"
+        email = "; ".join(e.value for e in record.emails) or "—"
         address = str(record.address) if record.address else "—"
         rows.append((record.name.value, phones, birthday, email, address))
 
     return show_paginated_table("Address Book", columns, rows)
 
-# Show contact phones as table
+
 @input_error
-def display_phone(args, book: AddressBook):  
+def display_phone(args, book: AddressBook):
     name = " ".join(args)
     record = book.find(name)
     if not record:
@@ -103,9 +99,9 @@ def display_phone(args, book: AddressBook):
 
     return table
 
-# Show contact birthday as table
+
 @input_error
-def display_birthday(args, book: AddressBook):  
+def display_birthday(args, book: AddressBook):
     name = args[0]
     record = book.find(name)
     if not record:
@@ -120,9 +116,9 @@ def display_birthday(args, book: AddressBook):
 
     return table
 
-# Show upcoming birthdays as table
+
 @input_error
-def display_birthdays(args, book: AddressBook):  
+def display_birthdays(args, book: AddressBook):
     days = int(args[0]) if args else 7
     upcoming = book.get_upcoming_birthdays(days=days)
     if not upcoming:
@@ -140,7 +136,6 @@ def display_birthdays(args, book: AddressBook):
     return table
 
 
-# Greeting messages for first and repeated greetings
 _GREETINGS = [
     "Hi! How can I help you?",
     "Hello! What can I do for you?",
@@ -149,8 +144,6 @@ _GREETINGS = [
     "Hi! Ready to help. What's up?",
 ]
 
-
-# Return a random greeting message
 _REPEAT_GREETINGS = [
     "We already said hello, but hi again!",
     "Again? Well, hello once more!",
@@ -161,8 +154,9 @@ _REPEAT_GREETINGS = [
 _hello_count = 0
 
 
-# Greeting message from the bot
 def hello_message(_args, _book):
+    # Count greetings so a repeat "hello" gets a playful variant instead of the
+    # same line again — a small touch of personality.
     global _hello_count
     _hello_count += 1
     if _hello_count > 1:
@@ -170,21 +164,40 @@ def hello_message(_args, _book):
     return random.choice(_GREETINGS)
 
 
-# Display all available commands and descriptions
 def show_help(_args, _book):
+    # Imported lazily, not at module top: the commands package imports the
+    # handlers, so a top-level import here would form a load-time cycle. By the
+    # time help is invoked the metadata module is fully available.
+    from commands.meta import COMMAND_META, GROUP_ORDER
+
     table = Table(
         title="Available commands", show_header=True, header_style="bold cyan"
     )
     table.add_column("Command", style="green")
     table.add_column("Description")
 
-    for cmd, (args, desc) in COMMAND_META.items():
-        if cmd == "exit":
+    # Group commands by the field/area they serve so related commands sit
+    # together instead of in registration order, which reads as a jumble.
+    grouped = {}
+    for cmd, (args, desc, group) in COMMAND_META.items():
+        grouped.setdefault(group, []).append((cmd, args, desc))
+
+    first_section = True
+    for group in GROUP_ORDER:
+        rows = grouped.get(group)
+        if not rows:
             continue
-        if cmd == "close":
-            table.add_row("close / exit", desc)
-            continue
-        args_escaped = args.replace("[", "\\[")
-        table.add_row(f"{cmd} {args_escaped}".strip(), desc)
+        if not first_section:
+            table.add_section()
+        first_section = False
+        table.add_row(f"[bold yellow]{group}[/bold yellow]", "")
+
+        for cmd, args, desc in rows:
+            # "exit" is folded into the "close" row since they're aliases.
+            if cmd == "exit":
+                continue
+            label = "close / exit" if cmd == "close" else cmd
+            args_escaped = args.replace("[", "\\[")
+            table.add_row(f"  {label} {args_escaped}".rstrip(), desc)
 
     return table

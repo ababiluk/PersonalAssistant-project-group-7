@@ -1,4 +1,2 @@
-prompt_toolkit==3.0.52
-pytest==9.0.3
-rich==15.0.0
-
+rich
+prompt_toolkit
