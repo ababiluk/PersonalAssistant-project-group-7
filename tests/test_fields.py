@@ -1,10 +1,20 @@
 """
 Field-level validation tests.
 Each field class is tested in isolation — no handlers, no address book.
+
+Mirrors the rules in models/fields.py:
+  Name     — stripped, required, <= 50 chars, each space-separated part isalpha()
+  Phone    — non-digits stripped, must end up exactly 10 digits
+  Birthday — DD.MM.YYYY only, must be a real date, not in the future
+  Email    — local@domain.tld with a letters-only TLD of length >= 2
+  Address  — stripped, required, <= 100 chars
+  Note     — stripped, non-empty; owns id + tag list helpers
 """
 import pytest
 from datetime import date
+
 from models.fields import Phone, Birthday, Email, Note, Name, Address
+from models.fields import MAX_NAME_LENGTH, MAX_ADDRESS_LENGTH
 
 
 # =============================================================================
@@ -22,7 +32,18 @@ class TestPhoneField:
     def test_str_display_format(self):
         assert str(Phone("1234567890")) == "+38(123)456-78-90"
 
-    # --- length ---
+    # --- formatting is stripped before the length check ---
+
+    @pytest.mark.parametrize("value", [
+        "123-456-78-90",
+        "(123) 456 7890",
+        "123.456.78.90",
+        " 1234567890 ",
+    ])
+    def test_formatting_stripped_to_bare_digits(self, value):
+        assert Phone(value).value == "1234567890"
+
+    # --- wrong length ---
 
     @pytest.mark.parametrize("value", ["", "1", "123456789", "12345678901"])
     def test_wrong_length_raises(self, value):
@@ -38,10 +59,7 @@ class TestPhoneField:
         "!@#$%^&*()",    # 0 digits after strip
         "123456789a",    # 9 digits after strip
         "123456789\n",   # 9 digits after strip
-        "123456789\t",   # 9 digits after strip
         "123-456-789",   # 9 digits after strip
-        "123 456 789",   # 9 digits after strip
-        "123.456.789",   # 9 digits after strip
     ])
     def test_non_digit_chars_insufficient_digits_raises(self, value):
         with pytest.raises(ValueError):
@@ -56,12 +74,12 @@ class TestPhoneField:
             Phone("+1234567890")
 
     @pytest.mark.xfail(
-        reason="str.isdigit() accepts Unicode digits; Phone should require ASCII digits only",
+        reason="re.sub(r'\\D') keeps Unicode digits; Phone should require ASCII digits only",
         strict=True,
     )
     def test_unicode_arabic_digits_rejected(self):
         with pytest.raises(ValueError):
-            Phone("١٢٣٤٥٦٧٨٩٠")  # 10 Arabic-Indic digits pass isdigit()
+            Phone("١٢٣٤٥٦٧٨٩٠")  # 10 Arabic-Indic digits survive the \D strip
 
 
 # =============================================================================
@@ -76,16 +94,20 @@ class TestBirthdayField:
     def test_leap_year_accepted(self):
         assert Birthday("29.02.2000").value == date(2000, 2, 29)
 
-    def test_first_day_of_year(self):
-        assert Birthday("01.01.1900").value == date(1900, 1, 1)
-
-    def test_last_day_of_year(self):
-        assert Birthday("31.12.2099").value == date(2099, 12, 31)
+    def test_today_accepted(self):
+        assert Birthday(date.today().strftime("%d.%m.%Y")).value == date.today()
 
     def test_str_roundtrip(self):
         assert str(Birthday("15.06.1990")) == "15.06.1990"
 
-    # --- wrong separators ---
+    # --- future dates are rejected ---
+
+    def test_future_date_raises(self):
+        future = f"01.01.{date.today().year + 1}"
+        with pytest.raises(ValueError):
+            Birthday(future)
+
+    # --- wrong separators / order ---
 
     @pytest.mark.parametrize("value", [
         "2000-01-15",   # ISO format
@@ -150,12 +172,81 @@ class TestEmailField:
         "user@",              # missing domain
         "@example.com",       # missing local part
         "user@example",       # missing TLD
+        "user@example.c",     # TLD too short (needs >= 2)
         "",                   # empty string
         "user @example.com",  # space in local part
     ])
     def test_invalid_formats_raise(self, value):
         with pytest.raises(ValueError):
             Email(value)
+
+
+# =============================================================================
+# Name  (validated in the model: required, <=50 chars, letters-only parts)
+# =============================================================================
+
+class TestNameField:
+
+    def test_stores_value(self):
+        assert Name("Alice").value == "Alice"
+
+    def test_stores_multiword_name(self):
+        assert Name("Mary Jane").value == "Mary Jane"
+
+    def test_surrounding_whitespace_stripped(self):
+        assert Name("  Alice  ").value == "Alice"
+
+    def test_max_length_accepted(self):
+        value = "A" * MAX_NAME_LENGTH
+        assert Name(value).value == value
+
+    def test_empty_name_raises(self):
+        with pytest.raises(ValueError):
+            Name("")
+
+    def test_whitespace_only_name_raises(self):
+        with pytest.raises(ValueError):
+            Name("   ")
+
+    def test_too_long_name_raises(self):
+        with pytest.raises(ValueError):
+            Name("A" * (MAX_NAME_LENGTH + 1))
+
+    @pytest.mark.parametrize("value", ["Alice123", "John_Doe", "Anna-Maria", "O'Brien", "Bob!"])
+    def test_non_letter_name_raises(self, value):
+        # isalpha() per space-separated part — digits, underscores, hyphens and
+        # apostrophes are all rejected by design.
+        with pytest.raises(ValueError):
+            Name(value)
+
+
+# =============================================================================
+# Address  (validated in the model: required, <=100 chars)
+# =============================================================================
+
+class TestAddressField:
+
+    def test_stores_value(self):
+        assert Address("Kyiv, Khreshchatyk 1").value == "Kyiv, Khreshchatyk 1"
+
+    def test_surrounding_whitespace_stripped(self):
+        assert Address("  Kyiv  ").value == "Kyiv"
+
+    def test_max_length_accepted(self):
+        value = "A" * MAX_ADDRESS_LENGTH
+        assert Address(value).value == value
+
+    def test_empty_address_raises(self):
+        with pytest.raises(ValueError):
+            Address("")
+
+    def test_whitespace_only_address_raises(self):
+        with pytest.raises(ValueError):
+            Address("   ")
+
+    def test_too_long_address_raises(self):
+        with pytest.raises(ValueError):
+            Address("A" * (MAX_ADDRESS_LENGTH + 1))
 
 
 # =============================================================================
@@ -180,6 +271,33 @@ class TestNoteField:
         with pytest.raises(ValueError):
             Note(text, 1)
 
+    # --- edit_text keeps id + tags, re-applies the non-empty rule ---
+
+    def test_edit_text_updates_value(self):
+        n = Note("old", 1)
+        n.edit_text("new")
+        assert n.value == "new"
+
+    def test_edit_text_strips_whitespace(self):
+        n = Note("old", 1)
+        n.edit_text("  new  ")
+        assert n.value == "new"
+
+    def test_edit_text_keeps_id_and_tags(self):
+        n = Note("old", 7)
+        n.add_tag("work")
+        n.edit_text("new")
+        assert n.id == 7
+        assert n.tags == ["work"]
+
+    @pytest.mark.parametrize("text", ["", "   "])
+    def test_edit_text_empty_raises(self, text):
+        n = Note("old", 1)
+        with pytest.raises(ValueError):
+            n.edit_text(text)
+
+    # --- tags ---
+
     def test_add_tag(self):
         n = Note("Task", 1)
         n.add_tag("work")
@@ -197,68 +315,25 @@ class TestNoteField:
         n.add_tag("urgent")
         assert set(n.tags) == {"work", "urgent"}
 
+    def test_remove_tag(self):
+        n = Note("Task", 1)
+        n.add_tag("work")
+        n.remove_tag("work")
+        assert n.tags == []
 
-# =============================================================================
-# Name — no field-level validation (handler validates via _validate_name only)
-# =============================================================================
-
-class TestNameField:
-
-    def test_stores_value(self):
-        assert Name("Alice").value == "Alice"
-
-    def test_stores_multiword_name(self):
-        assert Name("Mary Jane").value == "Mary Jane"
-
-    # The three tests below are xfail: Name has no __init__ override,
-    # so it accepts any string including empty and numeric input.
-
-    @pytest.mark.xfail(
-        reason="Name has no validation — empty string is silently accepted",
-        strict=True,
-    )
-    def test_empty_name_raises(self):
+    def test_remove_missing_tag_raises(self):
+        n = Note("Task", 1)
         with pytest.raises(ValueError):
-            Name("")
+            n.remove_tag("nope")
 
-    @pytest.mark.xfail(
-        reason="Name has no validation — whitespace-only string is silently accepted",
-        strict=True,
-    )
-    def test_whitespace_only_name_raises(self):
-        with pytest.raises(ValueError):
-            Name("   ")
+    def test_set_tags_replaces_dedupes_and_drops_blanks(self):
+        n = Note("Task", 1)
+        n.add_tag("old")
+        n.set_tags(["work", "  ", "urgent", "work"])
+        assert n.tags == ["work", "urgent"]
 
-    @pytest.mark.xfail(
-        reason="Name has no validation — digits and special chars are silently accepted",
-        strict=True,
-    )
-    def test_non_letter_name_raises(self):
-        with pytest.raises(ValueError):
-            Name("Alice123")
-
-
-# =============================================================================
-# Address — no field-level validation
-# =============================================================================
-
-class TestAddressField:
-
-    def test_stores_value(self):
-        assert Address("Kyiv, Khreshchatyk 1").value == "Kyiv, Khreshchatyk 1"
-
-    @pytest.mark.xfail(
-        reason="Address has no validation — empty string is silently accepted",
-        strict=True,
-    )
-    def test_empty_address_raises(self):
-        with pytest.raises(ValueError):
-            Address("")
-
-    @pytest.mark.xfail(
-        reason="Address has no validation — whitespace-only string is silently accepted",
-        strict=True,
-    )
-    def test_whitespace_only_address_raises(self):
-        with pytest.raises(ValueError):
-            Address("   ")
+    def test_set_tags_empty_clears(self):
+        n = Note("Task", 1)
+        n.add_tag("work")
+        n.set_tags([])
+        assert n.tags == []

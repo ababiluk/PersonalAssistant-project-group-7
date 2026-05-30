@@ -1,42 +1,47 @@
 """
-Handler and model tests organised by command group.
-Covers: Record model, AddressBook model, all command handlers,
-        input parsing, and data persistence.
-"""
-import pytest
-from datetime import date, timedelta
-from unittest.mock import patch
-from rich.table import Table
+Model and handler tests, organised by command group.
 
-import ast
+Covers: Record model, AddressBook model, every registered command handler
+(contacts / phones / emails / birthdays / addresses / notes / tags / display /
+export), input parsing, persistence, and the command-metadata contract.
+
+Interactive handlers read via input(); those prompts are mocked with
+unittest.mock.patch("builtins.input", side_effect=[...]).
+"""
 import csv
 import json
+from datetime import date, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
+import pytest
+from rich.table import Table
 from prompt_toolkit.document import Document
 
 from models.record import Record
 from models.address_book import AddressBook
-from handlers.command_meta import COMMAND_META
-from handlers.command_hints import CommandCompleter
+from commands.meta import COMMAND_META, GROUP_ORDER
+from commands.hints import CommandCompleter
+from commands.commands import commands as COMMANDS
+
+from handlers.contact_handlers import add_contact, delete_contact, find_contact
+from handlers.phone_handlers import change_contact, add_phone, remove_phone
+from handlers.email_handlers import add_email, edit_email, delete_email
+from handlers.birthday_handlers import add_birthday, edit_birthday, delete_birthday
+from handlers.address_handlers import add_address, edit_address, delete_address
+from handlers.display import (
+    display_all, display_phone, display_birthday, display_birthdays,
+    show_help, hello_message,
+)
+from handlers.note_handlers import (
+    add_note, edit_note, delete_note, show_notes, show_all_notes,
+    all_with_notes, find_notes, add_tag, edit_tag, delete_tag,
+    find_by_tag, sort_by_tags,
+)
 from handlers.export_handlers import (
     export_book, _record_to_dict, _resolve_path, _export_json, _export_csv,
 )
-from handlers.contact_handlers import (
-    add_contact, change_contact, delete_contact,
-    remove_phone, add_email, find_contact,
-)
-from handlers.birthday_handlers import add_birthday, show_birthday
-from handlers.display import (
-    display_all, display_phone, display_birthday,
-    display_birthdays, show_help, hello_message,
-)
-from handlers.note_handlers import (
-    add_note, edit_note, delete_note,
-    show_notes, show_all_notes, all_with_notes,
-    find_notes, add_tag, find_by_tag, sort_by_tags,
-)
-from handlers.utils import parse_input, save_data, load_data
+from handlers.utils import parse_input, save_data, load_data, get_validated_command
 
 
 # ---------------------------------------------------------------------------
@@ -44,13 +49,29 @@ from handlers.utils import parse_input, save_data, load_data
 # ---------------------------------------------------------------------------
 
 def _make_book(*contacts):
-    """Build an AddressBook populated with (name, phone) pairs."""
+    """Build an AddressBook from (name, phone) pairs (one phone each)."""
     book = AddressBook()
     for name, phone in contacts:
         r = Record(name)
         r.add_phone(phone)
         book.add_record(r)
     return book
+
+
+def _record(name, *phones):
+    """A standalone Record with zero or more phones."""
+    r = Record(name)
+    for p in phones:
+        r.add_phone(p)
+    return r
+
+
+def _birthday_in(offset_days, year=2000):
+    """A DD.MM.YYYY birthday whose month/day is `offset_days` from today, in a
+    past year — Birthday() rejects future dates, but get_upcoming_birthdays only
+    compares month/day, so a past-year date still lands in the upcoming window."""
+    target = date.today() + timedelta(days=offset_days)
+    return date(year, target.month, target.day).strftime("%d.%m.%Y")
 
 
 # =============================================================================
@@ -60,96 +81,118 @@ def _make_book(*contacts):
 class TestRecord:
 
     def test_add_and_find_phone(self):
-        r = Record("Alice")
-        r.add_phone("1234567890")
+        r = _record("Alice", "1234567890")
         assert r.find_phone("1234567890") is not None
 
     def test_multiple_phones_stored(self):
-        r = Record("Alice")
-        r.add_phone("1234567890")
-        r.add_phone("0987654321")
+        r = _record("Alice", "1234567890", "0987654321")
         assert len(r.phones) == 2
 
     def test_remove_phone(self):
-        r = Record("Alice")
-        r.add_phone("1234567890")
+        r = _record("Alice", "1234567890")
         r.remove_phone("1234567890")
         assert r.find_phone("1234567890") is None
 
     def test_remove_nonexistent_phone_raises(self):
         with pytest.raises(ValueError):
-            Record("Alice").remove_phone("1234567890")
+            _record("Alice").remove_phone("1234567890")
 
     def test_edit_phone(self):
-        r = Record("Alice")
-        r.add_phone("1234567890")
+        r = _record("Alice", "1234567890")
         r.edit_phone("1234567890", "0987654321")
         assert r.find_phone("0987654321") is not None
         assert r.find_phone("1234567890") is None
 
     def test_edit_nonexistent_phone_raises(self):
         with pytest.raises(ValueError):
-            Record("Alice").edit_phone("1234567890", "0987654321")
+            _record("Alice").edit_phone("1234567890", "0987654321")
 
     def test_find_phone_missing_returns_none(self):
-        assert Record("Alice").find_phone("1234567890") is None
+        assert _record("Alice").find_phone("1234567890") is None
+
+    # --- birthday (single-valued) ---
 
     def test_add_birthday(self):
-        r = Record("Alice")
+        r = _record("Alice")
         r.add_birthday("01.01.1990")
         assert str(r.birthday) == "01.01.1990"
 
-    def test_add_email(self):
-        r = Record("Alice")
+    def test_remove_birthday(self):
+        r = _record("Alice")
+        r.add_birthday("01.01.1990")
+        r.remove_birthday()
+        assert r.birthday is None
+
+    # --- emails (multi-valued, mirror phones) ---
+
+    def test_add_and_find_email(self):
+        r = _record("Alice")
         r.add_email("alice@example.com")
-        assert str(r.email) == "alice@example.com"
+        assert r.find_email("alice@example.com") is not None
+
+    def test_multiple_emails_stored(self):
+        r = _record("Alice")
+        r.add_email("a@example.com")
+        r.add_email("b@example.com")
+        assert len(r.emails) == 2
+
+    def test_remove_email(self):
+        r = _record("Alice")
+        r.add_email("alice@example.com")
+        r.remove_email("alice@example.com")
+        assert r.find_email("alice@example.com") is None
+
+    def test_remove_nonexistent_email_raises(self):
+        with pytest.raises(ValueError):
+            _record("Alice").remove_email("x@example.com")
+
+    def test_edit_email(self):
+        r = _record("Alice")
+        r.add_email("old@example.com")
+        r.edit_email("old@example.com", "new@example.com")
+        assert r.find_email("new@example.com") is not None
+        assert r.find_email("old@example.com") is None
+
+    # --- address (single-valued) ---
+
+    def test_add_address(self):
+        r = _record("Alice")
+        r.add_address("Kyiv, Main St 1")
+        assert str(r.address) == "Kyiv, Main St 1"
+
+    def test_remove_address(self):
+        r = _record("Alice")
+        r.add_address("Kyiv")
+        r.remove_address()
+        assert r.address is None
+
+    # --- notes ---
 
     def test_add_note(self):
-        r = Record("Alice")
+        r = _record("Alice")
         r.add_note("Buy milk", 1)
         assert r.notes[0].value == "Buy milk"
 
-    def test_edit_note(self):
-        r = Record("Alice")
-        r.add_note("Old text", 1)
-        r.edit_note(1, "New text")
-        assert r.notes[0].value == "New text"
-
-    def test_edit_note_wrong_id_raises(self):
-        r = Record("Alice")
-        r.add_note("text", 1)
-        with pytest.raises(IndexError):
-            r.edit_note(99, "new")
-
     def test_delete_note(self):
-        r = Record("Alice")
+        r = _record("Alice")
         r.add_note("text", 1)
         r.delete_note(1)
         assert r.notes == []
 
     def test_delete_note_wrong_id_raises(self):
         with pytest.raises(IndexError):
-            Record("Alice").delete_note(99)
+            _record("Alice").delete_note(99)
 
-    def test_add_tag_to_note(self):
-        r = Record("Alice")
-        r.add_note("task", 1)
-        r.add_tag_to_note(1, "work")
-        assert "work" in r.notes[0].tags
-
-    def test_add_tag_wrong_id_raises(self):
-        with pytest.raises(IndexError):
-            Record("Alice").add_tag_to_note(99, "work")
+    # --- __str__ ---
 
     def test_str_includes_name_and_phone(self):
-        r = Record("Alice")
-        r.add_phone("1234567890")
+        r = _record("Alice", "1234567890")
         s = str(r)
         assert "Alice" in s
         assert "1234567890" in s
 
     def test_str_no_phones_shows_label(self):
-        assert "No phones" in str(Record("Alice"))
+        assert "No phones" in str(_record("Alice"))
 
 
 # =============================================================================
@@ -160,9 +203,13 @@ class TestAddressBook:
 
     def test_add_and_find_record(self):
         book = AddressBook()
-        r = Record("Bob")
+        r = _record("Bob")
         book.add_record(r)
         assert book.find("Bob") is r
+
+    def test_find_is_case_insensitive(self):
+        book = _make_book(("Bob", "1234567890"))
+        assert book.find("bob") is book.find("BOB")
 
     def test_find_missing_returns_none(self):
         assert AddressBook().find("Nobody") is None
@@ -170,6 +217,11 @@ class TestAddressBook:
     def test_delete_record(self):
         book = _make_book(("Alice", "1234567890"))
         book.delete("Alice")
+        assert book.find("Alice") is None
+
+    def test_delete_is_case_insensitive(self):
+        book = _make_book(("Alice", "1234567890"))
+        book.delete("alice")
         assert book.find("Alice") is None
 
     def test_delete_missing_is_silent(self):
@@ -181,89 +233,129 @@ class TestAddressBook:
 
     # --- get_upcoming_birthdays ---
 
-    def test_birthday_inside_default_window_included(self):
+    def _book_with_birthday(self, offset_days):
         book = AddressBook()
-        r = Record("Alice")
-        r.add_birthday((date.today() + timedelta(days=3)).strftime("%d.%m.%Y"))
+        r = _record("Alice")
+        r.add_birthday(_birthday_in(offset_days))
         book.add_record(r)
+        return book
+
+    def test_birthday_inside_default_window_included(self):
+        book = self._book_with_birthday(3)
         assert any(e["name"] == "Alice" for e in book.get_upcoming_birthdays())
 
     def test_birthday_outside_window_excluded(self):
-        book = AddressBook()
-        r = Record("Alice")
-        r.add_birthday((date.today() + timedelta(days=10)).strftime("%d.%m.%Y"))
-        book.add_record(r)
-        assert not book.get_upcoming_birthdays()
+        book = self._book_with_birthday(10)
+        assert book.get_upcoming_birthdays() == []
 
     def test_birthday_today_included(self):
-        book = AddressBook()
-        r = Record("Alice")
-        r.add_birthday(date.today().strftime("%d.%m.%Y"))
-        book.add_record(r)
+        book = self._book_with_birthday(0)
         assert any(e["name"] == "Alice" for e in book.get_upcoming_birthdays())
 
     def test_no_birthday_excluded(self):
         assert _make_book(("Alice", "1234567890")).get_upcoming_birthdays() == []
 
     def test_custom_window(self):
-        book = AddressBook()
-        r = Record("Alice")
-        r.add_birthday((date.today() + timedelta(days=14)).strftime("%d.%m.%Y"))
-        book.add_record(r)
-        assert not book.get_upcoming_birthdays(days=7)
+        book = self._book_with_birthday(14)
+        assert book.get_upcoming_birthdays(days=7) == []
         assert book.get_upcoming_birthdays(days=14)
 
-    def test_saturday_birthday_shifted_to_monday(self):
+    def test_feb29_birthday_does_not_crash_in_non_leap_year(self, monkeypatch):
+        # Pin "today" to a non-leap year so Feb 29 has no direct counterpart.
+        import models.address_book as ab
+
+        class _FixedDate(date):
+            @classmethod
+            def today(cls):
+                return cls(2025, 1, 10)
+
+        monkeypatch.setattr(ab, "date", _FixedDate)
         book = AddressBook()
+        r = _record("Leap")
+        r.add_birthday("29.02.2000")
+        book.add_record(r)
+        result = book.get_upcoming_birthdays(days=400)  # must not raise
+        assert result[0]["name"] == "Leap"
+
+    def test_saturday_birthday_shifted_to_monday(self):
         today = date.today()
         days_to_sat = (5 - today.weekday()) % 7 or 7
+        if days_to_sat > 7:
+            pytest.skip("Next Saturday falls outside the 7-day window today.")
         saturday = today + timedelta(days=days_to_sat)
-        if days_to_sat <= 7:
-            r = Record("Alice")
-            r.add_birthday(saturday.strftime("%d.%m.%Y"))
-            book.add_record(r)
-            result = book.get_upcoming_birthdays()
-            if result:
-                expected = (saturday + timedelta(days=2)).strftime("%d.%m.%Y")
-                assert result[0]["congratulation_date"] == expected
+        book = AddressBook()
+        r = _record("Alice")
+        # Past-year birthday with Saturday's month/day (a current-year date would
+        # be in the future and rejected by Birthday()).
+        r.add_birthday(date(2000, saturday.month, saturday.day).strftime("%d.%m.%Y"))
+        book.add_record(r)
+        result = book.get_upcoming_birthdays()
+        expected = (saturday + timedelta(days=2)).strftime("%d.%m.%Y")
+        assert result[0]["congratulation_date"] == expected
 
 
 # =============================================================================
-# add command  (fully interactive — all prompts are mocked)
+# add command  (quick one-liner + guided interactive entry)
 # =============================================================================
 
-class TestAddContactCommand:
+class TestAddContactQuick:
+
+    def test_name_only_creates_contact(self):
+        book = AddressBook()
+        result = add_contact(["Alice"], book)
+        assert book.find("Alice") is not None
+        assert "created" in result
+
+    def test_name_and_phone_creates_contact(self):
+        book = AddressBook()
+        result = add_contact(["John", "1234567890"], book)
+        assert book.find("John").find_phone("1234567890") is not None
+        assert "1234567890" in result
+
+    def test_multi_word_name_title_cased(self):
+        book = AddressBook()
+        add_contact(["mary", "jane"], book)
+        assert book.find("Mary Jane") is not None
+
+    def test_existing_name_rejected(self):
+        book = _make_book(("Alice", "1234567890"))
+        assert "already exists" in add_contact(["Alice"], book)
+
+    def test_invalid_name_rejected(self):
+        book = AddressBook()
+        assert "Error" in add_contact(["Alice123"], book)
+        assert book.find("Alice123") is None
+
+
+class TestAddContactInteractive:
 
     def test_new_contact_created(self):
         book = AddressBook()
-        # inputs: name, phone, email (skip), birthday (skip), no address
-        with patch("builtins.input", side_effect=["Alice", "1234567890", "", "", "n"]):
+        # name, phone, email(skip), birthday(skip), address? n, note(skip)
+        with patch("builtins.input", side_effect=["Alice", "1234567890", "", "", "n", ""]):
             result = add_contact([], book)
         assert book.find("Alice") is not None
         assert "Error" not in result
 
-    def test_new_contact_with_all_optional_fields(self):
+    def test_new_contact_with_optional_fields(self):
         book = AddressBook()
-        inputs = ["John", "0987654321", "john@example.com", "15.06.1990", "n"]
+        inputs = ["John", "0987654321", "john@example.com", "15.06.1990", "n", ""]
         with patch("builtins.input", side_effect=inputs):
             add_contact([], book)
         r = book.find("John")
-        assert r is not None
-        assert str(r.email) == "john@example.com"
+        assert r.find_email("john@example.com") is not None
         assert str(r.birthday) == "15.06.1990"
 
     def test_multi_word_name_accepted(self):
         book = AddressBook()
-        with patch("builtins.input", side_effect=["Mary Jane", "1234567890", "", "", "n"]):
-            result = add_contact([], book)
-        # _validate_name splits on spaces — "Mary Jane" should be valid
+        with patch("builtins.input", side_effect=["mary jane", "1234567890", "", "", "n", ""]):
+            add_contact([], book)
         assert book.find("Mary Jane") is not None
-        assert "Error" not in result
 
     def test_existing_contact_add_phone(self):
         book = _make_book(("Alice", "1234567890"))
-        # inputs: name → phone → choice 1 (add) → no email → no birthday → no address
-        with patch("builtins.input", side_effect=["Alice", "0987654321", "1", "", "", "n"]):
+        # name, phone, choice=1 (add new), email, birthday, address? n, note
+        with patch("builtins.input", side_effect=["Alice", "0987654321", "1", "", "", "n", ""]):
             add_contact([], book)
         assert book.find("Alice").find_phone("0987654321") is not None
 
@@ -274,70 +366,105 @@ class TestAddContactCommand:
         assert "cancel" in result.lower()
         assert book.find("Alice").find_phone("0987654321") is None
 
+    def test_mandatory_name_cancel_aborts(self):
+        book = AddressBook()
+        with patch("builtins.input", side_effect=["cancel"]):
+            result = add_contact([], book)
+        assert "cancel" in result.lower()
+        assert len(book.data) == 0
 
-# =============================================================================
-# change command
-# =============================================================================
-
-class TestChangeContactCommand:
-
-    def test_phone_updated(self):
-        book = _make_book(("Bob", "1234567890"))
-        assert change_contact(["Bob", "1234567890", "0987654321"], book) == "Contact updated."
-        assert book.find("Bob").find_phone("0987654321") is not None
-
-    def test_contact_not_found(self):
-        assert "Error" in change_contact(["Ghost", "1234567890", "0987654321"], AddressBook())
-
-    def test_wrong_old_phone(self):
-        book = _make_book(("Bob", "1234567890"))
-        assert "Error" in change_contact(["Bob", "0000000000", "0987654321"], book)
-
-    def test_missing_new_phone_arg(self):
-        book = _make_book(("Bob", "1234567890"))
-        assert "Error" in change_contact(["Bob", "1234567890"], book)
-
-    def test_invalid_new_phone_format(self):
-        book = _make_book(("Bob", "1234567890"))
-        assert "Error" in change_contact(["Bob", "1234567890", "123"], book)
+    def test_mandatory_phone_cancel_aborts(self):
+        book = AddressBook()
+        with patch("builtins.input", side_effect=["Alice", "cancel"]):
+            result = add_contact([], book)
+        assert "cancel" in result.lower()
+        assert book.find("Alice") is None
 
 
 # =============================================================================
-# delete-contact command
-# =============================================================================
-
-class TestDeleteContactCommand:
-
-    def test_contact_deleted(self):
-        book = _make_book(("Carol", "1234567890"))
-        result = delete_contact(["Carol"], book)
-        assert "deleted" in result
-        assert book.find("Carol") is None
-
-    def test_contact_not_found(self):
-        assert "Error" in delete_contact(["Ghost"], AddressBook())
-
-    def test_missing_name_arg(self):
-        assert "Error" in delete_contact([], AddressBook())
-
-
-# =============================================================================
-# phone / delete-phone commands
+# edit-phone / add-phone / delete-phone
 # =============================================================================
 
 class TestPhoneCommands:
 
-    def test_display_phone_returns_table(self):
-        book = _make_book(("Dave", "1234567890"))
-        assert isinstance(display_phone(["Dave"], book), Table)
+    def test_edit_phone_single(self):
+        book = _make_book(("Bob", "1234567890"))
+        with patch("builtins.input", side_effect=["0987654321"]):
+            result = change_contact(["Bob"], book)
+        assert "0987654321" in result
+        assert book.find("Bob").find_phone("0987654321") is not None
 
-    def test_display_phone_contact_not_found(self):
-        assert "Error" in display_phone(["Ghost"], AddressBook())
+    def test_edit_phone_reprompts_on_invalid_then_accepts(self):
+        book = _make_book(("Bob", "1234567890"))
+        with patch("builtins.input", side_effect=["bad", "0987654321"]):
+            change_contact(["Bob"], book)
+        assert book.find("Bob").find_phone("0987654321") is not None
 
-    def test_remove_phone_success(self):
+    def test_edit_phone_choose_among_several(self):
+        book = AddressBook()
+        book.add_record(_record("Bob", "1111111111", "2222222222"))
+        # choose entry [1], then enter the new number
+        with patch("builtins.input", side_effect=["1", "3333333333"]):
+            change_contact(["Bob"], book)
+        assert book.find("Bob").find_phone("3333333333") is not None
+
+    def test_edit_phone_cancel(self):
+        book = _make_book(("Bob", "1234567890"))
+        with patch("builtins.input", side_effect=["cancel"]):
+            assert "cancel" in change_contact(["Bob"], book).lower()
+        assert book.find("Bob").find_phone("1234567890") is not None
+
+    def test_add_phone_prompted_cancel(self):
+        book = _make_book(("Alice", "1234567890"))
+        with patch("builtins.input", side_effect=["cancel"]):
+            assert "cancel" in add_phone(["Alice"], book).lower()
+        assert len(book.find("Alice").phones) == 1
+
+    def test_edit_phone_contact_not_found(self):
+        assert "Error" in change_contact(["Ghost"], AddressBook())
+
+    def test_edit_phone_no_phones(self):
+        book = AddressBook()
+        book.add_record(_record("Bob"))
+        assert "Error" in change_contact(["Bob"], book)
+
+    def test_add_phone_inline(self):
+        book = _make_book(("Alice", "1234567890"))
+        result = add_phone(["Alice", "0987654321"], book)
+        assert book.find("Alice").find_phone("0987654321") is not None
+        assert "0987654321" in result
+
+    def test_add_phone_prompted(self):
+        book = _make_book(("Alice", "1234567890"))
+        with patch("builtins.input", side_effect=["0987654321"]):
+            add_phone(["Alice"], book)
+        assert book.find("Alice").find_phone("0987654321") is not None
+
+    def test_add_phone_invalid_inline(self):
+        book = _make_book(("Alice", "1234567890"))
+        assert "Error" in add_phone(["Alice", "123"], book)
+
+    def test_add_phone_contact_not_found(self):
+        assert "Error" in add_phone(["Ghost", "1234567890"], AddressBook())
+
+    def test_remove_phone_inline(self):
         book = _make_book(("Dave", "1234567890"))
-        assert remove_phone(["Dave", "1234567890"], book) == "Phone removed."
+        result = remove_phone(["Dave", "1234567890"], book)
+        assert "removed" in result.lower()
         assert book.find("Dave").find_phone("1234567890") is None
+
+    def test_remove_phone_by_name_single(self):
+        book = _make_book(("Dave", "1234567890"))
+        result = remove_phone(["Dave"], book)
+        assert "1" in result
+        assert book.find("Dave").phones == []
+
+    def test_remove_phone_choose_all(self):
+        book = AddressBook()
+        book.add_record(_record("Dave", "1111111111", "2222222222"))
+        with patch("builtins.input", side_effect=["all"]):
+            remove_phone(["Dave"], book)
+        assert book.find("Dave").phones == []
 
     def test_remove_phone_contact_not_found(self):
         assert "Error" in remove_phone(["Ghost", "1234567890"], AddressBook())
@@ -346,99 +473,208 @@ class TestPhoneCommands:
         book = _make_book(("Dave", "1234567890"))
         assert "Error" in remove_phone(["Dave", "0000000000"], book)
 
-    def test_remove_phone_missing_phone_arg(self):
-        book = _make_book(("Dave", "1234567890"))
+    def test_remove_phone_no_phones(self):
+        book = AddressBook()
+        book.add_record(_record("Dave"))
         assert "Error" in remove_phone(["Dave"], book)
 
 
 # =============================================================================
-# add-email command
+# add-email / edit-email / delete-email
 # =============================================================================
 
 class TestEmailCommands:
 
-    def test_email_added(self):
+    def _book_with_email(self, *emails):
+        book = _make_book(("Eve", "1234567890"))
+        for e in emails:
+            book.find("Eve").add_email(e)
+        return book
+
+    def test_add_email_inline(self):
         book = _make_book(("Eve", "1234567890"))
         result = add_email(["Eve", "eve@example.com"], book)
-        assert result == "Email added."
-        assert str(book.find("Eve").email) == "eve@example.com"
+        assert "eve@example.com" in result
+        assert book.find("Eve").find_email("eve@example.com") is not None
 
-    def test_invalid_email_format(self):
+    def test_add_email_prompted(self):
+        book = _make_book(("Eve", "1234567890"))
+        with patch("builtins.input", side_effect=["eve@example.com"]):
+            add_email(["Eve"], book)
+        assert book.find("Eve").find_email("eve@example.com") is not None
+
+    def test_add_email_duplicate_rejected(self):
+        book = self._book_with_email("eve@example.com")
+        assert "already has email" in add_email(["Eve", "eve@example.com"], book)
+
+    def test_add_email_invalid_format(self):
         book = _make_book(("Eve", "1234567890"))
         assert "Error" in add_email(["Eve", "not-an-email"], book)
 
-    def test_contact_not_found(self):
+    def test_add_email_contact_not_found(self):
         assert "Error" in add_email(["Ghost", "x@example.com"], AddressBook())
 
-    def test_missing_email_arg(self):
+    def test_add_email_prompted_cancel(self):
         book = _make_book(("Eve", "1234567890"))
-        assert "Error" in add_email(["Eve"], book)
+        with patch("builtins.input", side_effect=["cancel"]):
+            assert "cancel" in add_email(["Eve"], book).lower()
+        assert book.find("Eve").emails == []
+
+    def test_edit_email_cancel(self):
+        book = self._book_with_email("old@example.com")
+        with patch("builtins.input", side_effect=["cancel"]):
+            assert "cancel" in edit_email(["Eve"], book).lower()
+        assert book.find("Eve").find_email("old@example.com") is not None
+
+    def test_edit_email_single(self):
+        book = self._book_with_email("old@example.com")
+        with patch("builtins.input", side_effect=["new@example.com"]):
+            edit_email(["Eve"], book)
+        assert book.find("Eve").find_email("new@example.com") is not None
+
+    def test_edit_email_choose_among_several(self):
+        book = self._book_with_email("a@example.com", "b@example.com")
+        with patch("builtins.input", side_effect=["1", "new@example.com"]):
+            edit_email(["Eve"], book)
+        assert book.find("Eve").find_email("new@example.com") is not None
+
+    def test_edit_email_no_emails(self):
+        book = _make_book(("Eve", "1234567890"))
+        assert "Error" in edit_email(["Eve"], book)
+
+    def test_delete_email_inline(self):
+        book = self._book_with_email("eve@example.com")
+        result = delete_email(["Eve", "eve@example.com"], book)
+        assert "removed" in result.lower()
+        assert book.find("Eve").emails == []
+
+    def test_delete_email_by_name_single(self):
+        book = self._book_with_email("eve@example.com")
+        delete_email(["Eve"], book)
+        assert book.find("Eve").emails == []
+
+    def test_delete_email_choose_all(self):
+        book = self._book_with_email("a@example.com", "b@example.com")
+        with patch("builtins.input", side_effect=["all"]):
+            delete_email(["Eve"], book)
+        assert book.find("Eve").emails == []
+
+    def test_delete_email_no_emails(self):
+        book = _make_book(("Eve", "1234567890"))
+        assert "Error" in delete_email(["Eve"], book)
 
 
 # =============================================================================
-# add-birthday / show-birthday / birthdays commands
+# add-birthday / edit-birthday / delete-birthday / show-birthday / upcoming
 # =============================================================================
 
 class TestBirthdayCommands:
 
-    def test_birthday_added(self):
+    def test_add_birthday_inline(self):
         book = _make_book(("Frank", "1234567890"))
-        assert add_birthday(["Frank", "01.01.1990"], book) == "Birthday added."
+        result = add_birthday(["Frank", "01.01.1990"], book)
+        assert "01.01.1990" in result
         assert str(book.find("Frank").birthday) == "01.01.1990"
 
-    def test_birthday_overwrites_existing(self):
+    def test_add_birthday_prompted(self):
+        book = _make_book(("Frank", "1234567890"))
+        with patch("builtins.input", side_effect=["01.01.1990"]):
+            add_birthday(["Frank"], book)
+        assert str(book.find("Frank").birthday) == "01.01.1990"
+
+    def test_add_birthday_refuses_to_overwrite(self):
         book = _make_book(("Frank", "1234567890"))
         add_birthday(["Frank", "01.01.1990"], book)
-        add_birthday(["Frank", "20.07.1991"], book)
-        assert str(book.find("Frank").birthday) == "20.07.1991"
+        assert "already has a birthday" in add_birthday(["Frank", "20.07.1991"], book)
+        assert str(book.find("Frank").birthday) == "01.01.1990"
 
-    def test_birthday_invalid_format(self):
+    def test_add_birthday_invalid_format(self):
         book = _make_book(("Frank", "1234567890"))
         assert "Error" in add_birthday(["Frank", "1990-01-01"], book)
 
-    def test_birthday_impossible_date(self):
+    def test_add_birthday_impossible_date(self):
         book = _make_book(("Frank", "1234567890"))
         assert "Error" in add_birthday(["Frank", "30.02.2000"], book)
 
-    def test_birthday_contact_not_found(self):
+    def test_add_birthday_contact_not_found(self):
         assert "Error" in add_birthday(["Ghost", "01.01.1990"], AddressBook())
 
-    def test_birthday_missing_date_arg(self):
-        book = _make_book(("Frank", "1234567890"))
-        assert "Error" in add_birthday(["Frank"], book)
-
-    def test_show_birthday_returns_date_string(self):
+    def test_edit_birthday(self):
         book = _make_book(("Frank", "1234567890"))
         add_birthday(["Frank", "01.01.1990"], book)
-        assert show_birthday(["Frank"], book) == "01.01.1990"
+        edit_birthday(["Frank", "20.07.1991"], book)
+        assert str(book.find("Frank").birthday) == "20.07.1991"
 
-    def test_show_birthday_not_set(self):
+    def test_edit_birthday_when_none(self):
         book = _make_book(("Frank", "1234567890"))
-        assert "no birthday" in show_birthday(["Frank"], book)
+        assert "Error" in edit_birthday(["Frank", "01.01.1990"], book)
 
-    def test_show_birthday_contact_not_found(self):
-        assert "Error" in show_birthday(["Ghost"], AddressBook())
-
-    def test_display_birthdays_no_upcoming(self):
-        result = display_birthdays([], _make_book(("Frank", "1234567890")))
-        assert "No birthdays" in result
-
-    def test_display_birthdays_upcoming_returns_table(self):
+    def test_delete_birthday(self):
         book = _make_book(("Frank", "1234567890"))
-        soon = (date.today() + timedelta(days=2)).strftime("%d.%m.%Y")
-        add_birthday(["Frank", soon], book)
-        assert isinstance(display_birthdays([], book), Table)
+        add_birthday(["Frank", "01.01.1990"], book)
+        delete_birthday(["Frank"], book)
+        assert book.find("Frank").birthday is None
 
-    def test_display_birthdays_custom_window(self):
+    def test_delete_birthday_when_none(self):
         book = _make_book(("Frank", "1234567890"))
-        far = (date.today() + timedelta(days=20)).strftime("%d.%m.%Y")
-        add_birthday(["Frank", far], book)
-        assert "No birthdays" in display_birthdays([], book)          # default 7 days
-        assert isinstance(display_birthdays(["30"], book), Table)     # 30-day window
+        assert "Error" in delete_birthday(["Frank"], book)
 
 
 # =============================================================================
-# Note commands
+# add-address / edit-address / delete-address  (guided, interactive)
+# =============================================================================
+
+class TestAddressCommands:
+
+    def _book_with_address(self):
+        book = _make_book(("Carl", "1234567890"))
+        book.find("Carl").add_address("Ukraine, Kyiv")
+        return book
+
+    def test_add_address_success(self):
+        book = _make_book(("Carl", "1234567890"))
+        # country, city, street, house, apt(skip), zip(skip)
+        with patch("builtins.input", side_effect=["Ukraine", "Kyiv", "Main St", "1", "", ""]):
+            result = add_address(["Carl"], book)
+        assert "added" in result.lower()
+        assert "Ukraine" in str(book.find("Carl").address)
+
+    def test_add_address_cancel(self):
+        book = _make_book(("Carl", "1234567890"))
+        with patch("builtins.input", side_effect=["cancel"]):
+            result = add_address(["Carl"], book)
+        assert "cancel" in result.lower()
+        assert book.find("Carl").address is None
+
+    def test_add_address_refuses_to_overwrite(self):
+        book = self._book_with_address()
+        assert "already has an address" in add_address(["Carl"], book)
+
+    def test_add_address_contact_not_found(self):
+        assert "Error" in add_address(["Ghost"], AddressBook())
+
+    def test_edit_address_success(self):
+        book = self._book_with_address()
+        with patch("builtins.input", side_effect=["Poland", "Warsaw", "Main St", "5", "", ""]):
+            edit_address(["Carl"], book)
+        assert "Poland" in str(book.find("Carl").address)
+
+    def test_edit_address_when_none(self):
+        book = _make_book(("Carl", "1234567890"))
+        assert "Error" in edit_address(["Carl"], book)
+
+    def test_delete_address(self):
+        book = self._book_with_address()
+        delete_address(["Carl"], book)
+        assert book.find("Carl").address is None
+
+    def test_delete_address_when_none(self):
+        book = _make_book(("Carl", "1234567890"))
+        assert "Error" in delete_address(["Carl"], book)
+
+
+# =============================================================================
+# Notes
 # =============================================================================
 
 class TestNoteCommands:
@@ -451,6 +687,13 @@ class TestNoteCommands:
 
     def test_add_note_contact_not_found(self):
         assert "Error" in add_note(["Ghost", "text"], AddressBook())
+
+    def test_add_note_multi_word_name(self):
+        book = AddressBook()
+        book.add_record(_record("Mary Jane", "1234567890"))
+        result = add_note(["Mary", "Jane", "Buy", "milk"], book)
+        assert "added" in result
+        assert book.find("Mary Jane").notes[0].value == "Buy milk"
 
     def test_add_note_missing_text(self):
         book = _make_book(("Grace", "1234567890"))
@@ -466,41 +709,53 @@ class TestNoteCommands:
         all_ids = [n.id for r in book.data.values() for n in r.notes]
         assert len(all_ids) == len(set(all_ids))
 
-    def test_edit_note_success(self):
+    def test_edit_note_by_contact(self):
         book = _make_book(("Grace", "1234567890"))
         add_note(["Grace", "original"], book)
-        note_id = book.find("Grace").notes[0].id
-        with patch("builtins.input", side_effect=[str(note_id), "updated text"]):
+        with patch("builtins.input", side_effect=["updated text"]):
             result = edit_note(["Grace"], book)
         assert "updated" in result
         assert book.find("Grace").notes[0].value == "updated text"
 
-    @pytest.mark.xfail(
-        reason="edit_note replaces the Note object with Note(new_text, id), discarding all tags",
-        strict=True,
-    )
+    def test_edit_note_by_id(self):
+        book = _make_book(("Grace", "1234567890"))
+        add_note(["Grace", "original"], book)
+        note_id = book.find("Grace").notes[0].id
+        with patch("builtins.input", side_effect=["updated via id"]):
+            edit_note([str(note_id)], book)
+        assert book.find("Grace").notes[0].value == "updated via id"
+
     def test_edit_note_preserves_tags(self):
+        # edit_text keeps id + tags (previously a bug rebuilt the Note and lost them).
         book = _make_book(("Grace", "1234567890"))
         add_note(["Grace", "task"], book)
-        note_id = book.find("Grace").notes[0].id
-        with patch("builtins.input", side_effect=[str(note_id), "work"]):
+        with patch("builtins.input", side_effect=["work"]):
             add_tag(["Grace"], book)
-        with patch("builtins.input", side_effect=[str(note_id), "updated task"]):
+        with patch("builtins.input", side_effect=["updated task"]):
             edit_note(["Grace"], book)
-        assert "work" in book.find("Grace").notes[0].tags
+        assert book.find("Grace").notes[0].tags == ["work"]
 
     def test_edit_note_no_notes(self):
         book = _make_book(("Grace", "1234567890"))
         assert "Error" in edit_note(["Grace"], book)
 
-    def test_delete_note_success(self):
+    def test_delete_note_by_contact(self):
+        book = _make_book(("Grace", "1234567890"))
+        add_note(["Grace", "to delete"], book)
+        result = delete_note(["Grace"], book)
+        assert "deleted" in result
+        assert book.find("Grace").notes == []
+
+    def test_delete_note_by_id(self):
         book = _make_book(("Grace", "1234567890"))
         add_note(["Grace", "to delete"], book)
         note_id = book.find("Grace").notes[0].id
-        with patch("builtins.input", return_value=str(note_id)):
-            result = delete_note(["Grace"], book)
-        assert "deleted" in result
+        delete_note([str(note_id)], book)
         assert book.find("Grace").notes == []
+
+    def test_delete_note_unknown_id(self):
+        book = _make_book(("Grace", "1234567890"))
+        assert "Error" in delete_note(["999"], book)
 
     def test_show_notes_returns_table(self):
         book = _make_book(("Grace", "1234567890"))
@@ -529,41 +784,81 @@ class TestNoteCommands:
         add_note(["Grace", "buy milk"], book)
         assert "No notes found" in find_notes(["coffee"], book)
 
+    def test_find_notes_missing_query(self):
+        assert "Error" in find_notes([], AddressBook())
+
 
 # =============================================================================
-# Tag commands
+# Tags
 # =============================================================================
 
 class TestTagCommands:
 
-    def _book_with_tagged_note(self, name, note_text, tag):
+    def _book_with_tagged_note(self, name="Ivan", text="task", *tags):
         book = _make_book((name, "1234567890"))
-        add_note([name, note_text], book)
-        note_id = book.find(name).notes[0].id
-        with patch("builtins.input", side_effect=[str(note_id), tag]):
-            add_tag([name], book)
+        add_note([name, text], book)
+        for tag in tags:
+            book.find(name).notes[0].add_tag(tag)
         return book
 
-    def test_add_tag_success(self):
+    def test_add_tag_single(self):
         book = _make_book(("Ivan", "1234567890"))
         add_note(["Ivan", "work task"], book)
-        note_id = book.find("Ivan").notes[0].id
-        with patch("builtins.input", side_effect=[str(note_id), "work"]):
+        with patch("builtins.input", side_effect=["work"]):
             result = add_tag(["Ivan"], book)
         assert "work" in result
         assert "work" in book.find("Ivan").notes[0].tags
 
-    def test_add_tag_contact_has_no_notes(self):
+    def test_add_tag_multiple_comma_separated(self):
+        book = _make_book(("Ivan", "1234567890"))
+        add_note(["Ivan", "task"], book)
+        with patch("builtins.input", side_effect=["work, urgent"]):
+            add_tag(["Ivan"], book)
+        assert set(book.find("Ivan").notes[0].tags) == {"work", "urgent"}
+
+    def test_add_tag_no_notes(self):
         book = _make_book(("Ivan", "1234567890"))
         assert "Error" in add_tag(["Ivan"], book)
+
+    def test_add_tag_empty_input(self):
+        book = _make_book(("Ivan", "1234567890"))
+        add_note(["Ivan", "task"], book)
+        with patch("builtins.input", side_effect=[""]):
+            assert "Error" in add_tag(["Ivan"], book)
+
+    def test_edit_tag_replaces_list(self):
+        book = self._book_with_tagged_note("Ivan", "task", "old")
+        with patch("builtins.input", side_effect=["work, urgent"]):
+            edit_tag(["Ivan"], book)
+        assert book.find("Ivan").notes[0].tags == ["work", "urgent"]
+
+    def test_edit_tag_blank_clears(self):
+        book = self._book_with_tagged_note("Ivan", "task", "old")
+        with patch("builtins.input", side_effect=[""]):
+            edit_tag(["Ivan"], book)
+        assert book.find("Ivan").notes[0].tags == []
+
+    def test_delete_tag_single(self):
+        book = self._book_with_tagged_note("Ivan", "task", "work")
+        delete_tag(["Ivan"], book)
+        assert book.find("Ivan").notes[0].tags == []
+
+    def test_delete_tag_choose_all(self):
+        book = self._book_with_tagged_note("Ivan", "task", "work", "urgent")
+        with patch("builtins.input", side_effect=["all"]):
+            delete_tag(["Ivan"], book)
+        assert book.find("Ivan").notes[0].tags == []
+
+    def test_delete_tag_no_tags(self):
+        book = self._book_with_tagged_note("Ivan", "task")
+        assert "Error" in delete_tag(["Ivan"], book)
 
     def test_find_by_tag_returns_table(self):
         book = self._book_with_tagged_note("Ivan", "task", "urgent")
         assert isinstance(find_by_tag(["urgent"], book), Table)
 
     def test_find_by_tag_no_match(self):
-        book = _make_book(("Ivan", "1234567890"))
-        add_note(["Ivan", "task"], book)
+        book = self._book_with_tagged_note("Ivan", "task", "work")
         assert "No notes found" in find_by_tag(["nonexistent"], book)
 
     def test_sort_by_tags_returns_table(self):
@@ -580,7 +875,7 @@ class TestTagCommands:
 
 
 # =============================================================================
-# Display commands
+# Display / search
 # =============================================================================
 
 class TestDisplayCommands:
@@ -590,6 +885,15 @@ class TestDisplayCommands:
 
     def test_display_all_returns_table(self):
         assert isinstance(display_all([], _make_book(("Alice", "1234567890"))), Table)
+
+    def test_display_phone_returns_table(self):
+        assert isinstance(display_phone(["Dave"], _make_book(("Dave", "1234567890"))), Table)
+
+    def test_display_phone_contact_not_found(self):
+        assert "Error" in display_phone(["Ghost"], AddressBook())
+
+    def test_display_phone_missing_arg(self):
+        assert "Error" in display_phone([], AddressBook())
 
     def test_find_contact_by_exact_name(self):
         book = _make_book(("Alice", "1234567890"))
@@ -606,6 +910,9 @@ class TestDisplayCommands:
     def test_find_contact_no_results(self):
         assert "No contacts found" in find_contact(["xyz"], _make_book(("Alice", "1234567890")))
 
+    def test_find_contact_missing_query(self):
+        assert "Error" in find_contact([], AddressBook())
+
     def test_all_with_notes_empty_book(self):
         assert "No contacts" in all_with_notes([], AddressBook())
 
@@ -619,27 +926,49 @@ class TestDisplayCommands:
         add_birthday(["Alice", "01.01.1990"], book)
         assert isinstance(display_birthday(["Alice"], book), Table)
 
+    def test_display_birthday_not_set(self):
+        book = _make_book(("Alice", "1234567890"))
+        assert "no birthday" in display_birthday(["Alice"], book)
+
+    def test_display_birthday_contact_not_found(self):
+        assert "Error" in display_birthday(["Ghost"], AddressBook())
+
+    def test_display_birthdays_none_upcoming(self):
+        assert "No birthdays" in display_birthdays([], _make_book(("Frank", "1234567890")))
+
+    def test_display_birthdays_upcoming_returns_table(self):
+        book = _make_book(("Frank", "1234567890"))
+        add_birthday(["Frank", _birthday_in(2)], book)
+        assert isinstance(display_birthdays([], book), Table)
+
+    def test_display_birthdays_custom_window(self):
+        book = _make_book(("Frank", "1234567890"))
+        add_birthday(["Frank", _birthday_in(20)], book)
+        assert "No birthdays" in display_birthdays([], book)          # default 7 days
+        assert isinstance(display_birthdays(["30"], book), Table)     # 30-day window
+
     def test_show_help_returns_table(self):
         assert isinstance(show_help([], AddressBook()), Table)
 
-    def test_show_help_row_count_matches_command_meta(self):
-        # "exit" is merged with "close" → one fewer row than COMMAND_META entries
-        expected = len(COMMAND_META) - 1
+    def test_show_help_row_count(self):
+        # One group-header row per non-empty group + one row per command,
+        # except "exit" which is folded into the "close" row.
+        groups = {g for (_, _, g) in COMMAND_META.values()} & set(GROUP_ORDER)
+        expected = len(groups) + (len(COMMAND_META) - 1)
         assert show_help([], AddressBook()).row_count == expected
 
     def test_show_help_contains_known_commands(self):
         from io import StringIO
         from rich.console import Console
-        table = show_help([], AddressBook())
         buf = StringIO()
-        Console(file=buf, width=200, force_terminal=False).print(table)
+        Console(file=buf, width=200, force_terminal=False).print(show_help([], AddressBook()))
         rendered = buf.getvalue()
-        for cmd in ("add", "change", "find", "add-note", "add-tag", "birthdays"):
+        for cmd in ("add", "edit-phone", "find-contact", "add-note", "add-tag", "upcoming-birthdays"):
             assert cmd in rendered
 
     def test_hello_returns_non_empty_string(self):
         result = hello_message([], AddressBook())
-        assert isinstance(result, str) and len(result) > 0
+        assert isinstance(result, str) and result
 
 
 # =============================================================================
@@ -667,15 +996,31 @@ class TestParseInput:
 
 
 # =============================================================================
-# Data persistence
+# Command validation / suggestions
+# =============================================================================
+
+class TestGetValidatedCommand:
+
+    def test_exact_match_returned(self):
+        assert get_validated_command("add", ["add", "help"]) == "add"
+
+    def test_typo_returns_none(self):
+        # A close typo shows suggestions but does not auto-run a guess.
+        assert get_validated_command("addd", ["add", "help"]) is None
+
+    def test_unknown_returns_none(self):
+        assert get_validated_command("zzzzz", ["add", "help"]) is None
+
+
+# =============================================================================
+# Persistence
 # =============================================================================
 
 class TestPersistence:
 
     def test_save_and_reload(self, tmp_path):
         path = str(tmp_path / "book.pkl")
-        book = _make_book(("Alice", "1234567890"))
-        save_data(book, path)
+        save_data(_make_book(("Alice", "1234567890")), path)
         loaded = load_data(path)
         assert loaded.find("Alice").find_phone("1234567890") is not None
 
@@ -689,59 +1034,42 @@ class TestPersistence:
         book = _make_book(("Alice", "1234567890"))
         add_birthday(["Alice", "01.06.1990"], book)
         add_email(["Alice", "alice@example.com"], book)
+        book.find("Alice").add_address("Kyiv")
         add_note(["Alice", "a note"], book)
         save_data(book, path)
         r = load_data(path).find("Alice")
         assert str(r.birthday) == "01.06.1990"
-        assert str(r.email) == "alice@example.com"
+        assert r.find_email("alice@example.com") is not None
+        assert str(r.address) == "Kyiv"
         assert r.notes[0].value == "a note"
 
 
 # =============================================================================
-# COMMAND_META contract
+# COMMAND_META / commands registry contract
 # =============================================================================
-
-def _registered_commands():
-    """
-    Parse commands.py with AST to extract the keys of the 'commands' dict
-    without importing the module (importing triggers a circular import via
-    handlers/utils.py -> commands.py).
-    """
-    src = (Path(__file__).parent.parent / "commands.py").read_text(encoding="utf-8")
-    tree = ast.parse(src)
-    for node in ast.walk(tree):
-        if (
-            isinstance(node, ast.Assign)
-            and any(isinstance(t, ast.Name) and t.id == "commands" for t in node.targets)
-            and isinstance(node.value, ast.Dict)
-        ):
-            return {
-                k.value for k in node.value.keys
-                if isinstance(k, ast.Constant)
-            }
-    return set()
-
 
 class TestCommandMeta:
 
     def test_all_registered_commands_have_meta_entry(self):
-        # Every command in commands.py must appear in COMMAND_META so that
-        # tab-completion and help stay in sync when new commands are added.
-        registered = _registered_commands()
-        missing = registered - set(COMMAND_META.keys())
+        # Every dispatchable command must be documented in COMMAND_META so help
+        # and tab-completion stay in sync.
+        missing = set(COMMANDS.keys()) - set(COMMAND_META.keys())
         assert missing == set(), f"Commands missing from COMMAND_META: {missing}"
 
-    def test_each_entry_is_two_string_tuple(self):
+    def test_each_entry_is_three_string_tuple_with_valid_group(self):
         for cmd, value in COMMAND_META.items():
-            assert isinstance(value, tuple) and len(value) == 2, \
-                f"COMMAND_META['{cmd}'] should be a 2-tuple"
-            args_hint, description = value
+            assert isinstance(value, tuple) and len(value) == 3, \
+                f"COMMAND_META['{cmd}'] should be a 3-tuple"
+            args_hint, description, group = value
             assert isinstance(args_hint, str), f"args_hint for '{cmd}' must be str"
             assert isinstance(description, str) and description, \
                 f"description for '{cmd}' must be a non-empty str"
+            assert group in GROUP_ORDER, f"group '{group}' for '{cmd}' not in GROUP_ORDER"
 
-    def test_no_duplicate_command_names(self):
-        assert len(COMMAND_META) == len(set(COMMAND_META))
+    def test_close_and_exit_documented_but_not_dispatched(self):
+        # close/exit are handled in the REPL loop, not the commands dict.
+        assert {"close", "exit"} <= set(COMMAND_META.keys())
+        assert "close" not in COMMANDS and "exit" not in COMMANDS
 
 
 # =============================================================================
@@ -751,13 +1079,11 @@ class TestCommandMeta:
 class TestCommandCompleter:
 
     def _completions(self, text):
-        """Return list of completion strings for the given input text."""
         doc = Document(text)
         return [c.text for c in CommandCompleter().get_completions(doc, None)]
 
     def test_empty_input_returns_all_commands(self):
-        result = self._completions("")
-        assert set(result) == set(COMMAND_META.keys())
+        assert set(self._completions("")) == set(COMMAND_META.keys())
 
     def test_prefix_filters_matching_commands(self):
         result = self._completions("ad")
@@ -772,36 +1098,29 @@ class TestCommandCompleter:
         assert "add-note" in result
 
     def test_unmatched_prefix_returns_empty(self):
-        assert self._completions("xyz") == []
+        assert self._completions("zzzzz") == []
 
     def test_input_with_space_returns_empty(self):
-        # Completer only handles the command word; stops after a space
         assert self._completions("add ") == []
         assert self._completions("add Alice") == []
 
     def test_matching_is_case_insensitive(self):
-        lower = set(self._completions("add"))
-        upper = set(self._completions("ADD"))
-        assert lower == upper
+        assert set(self._completions("add")) == set(self._completions("ADD"))
 
     def test_completion_display_meta_contains_description(self):
-        doc = Document("hello")
-        completions = list(CommandCompleter().get_completions(doc, None))
+        completions = list(CommandCompleter().get_completions(Document("hello"), None))
         assert len(completions) == 1
-        meta = str(completions[0].display_meta)
-        assert "Greet" in meta
+        assert "Greet" in str(completions[0].display_meta)
 
 
 # =============================================================================
-# Export: helper functions
+# Export: _record_to_dict
 # =============================================================================
 
 class TestRecordToDict:
 
     def _full_record(self):
-        r = Record("Alice")
-        r.add_phone("1234567890")
-        r.add_phone("0987654321")
+        r = _record("Alice", "1234567890", "0987654321")
         r.add_email("alice@example.com")
         r.add_birthday("15.06.1990")
         r.add_address("Kyiv, Main St 1")
@@ -811,88 +1130,76 @@ class TestRecordToDict:
         return r
 
     def test_name_exported(self):
-        assert _record_to_dict(Record("Alice"))["name"] == "Alice"
+        assert _record_to_dict(_record("Alice"))["name"] == "Alice"
 
     def test_phones_exported_as_list(self):
-        r = Record("Alice")
-        r.add_phone("1234567890")
-        r.add_phone("0987654321")
-        d = _record_to_dict(r)
-        assert d["phones"] == ["1234567890", "0987654321"]
+        r = _record("Alice", "1234567890", "0987654321")
+        assert _record_to_dict(r)["phones"] == ["1234567890", "0987654321"]
 
-    def test_email_exported(self):
-        r = Record("Alice")
-        r.add_email("alice@example.com")
-        assert _record_to_dict(r)["email"] == "alice@example.com"
+    def test_emails_exported_as_list(self):
+        r = _record("Alice")
+        r.add_email("a@example.com")
+        r.add_email("b@example.com")
+        assert _record_to_dict(r)["emails"] == ["a@example.com", "b@example.com"]
 
-    def test_email_empty_when_not_set(self):
-        assert _record_to_dict(Record("Alice"))["email"] == ""
+    def test_emails_empty_list_when_none(self):
+        assert _record_to_dict(_record("Alice"))["emails"] == []
 
     def test_birthday_exported_as_string(self):
-        r = Record("Alice")
+        r = _record("Alice")
         r.add_birthday("15.06.1990")
         assert _record_to_dict(r)["birthday"] == "15.06.1990"
 
     def test_birthday_empty_when_not_set(self):
-        assert _record_to_dict(Record("Alice"))["birthday"] == ""
+        assert _record_to_dict(_record("Alice"))["birthday"] == ""
 
     def test_address_exported(self):
-        r = Record("Alice")
+        r = _record("Alice")
         r.add_address("Kyiv, Main St 1")
         assert _record_to_dict(r)["address"] == "Kyiv, Main St 1"
 
     def test_notes_exported_with_id_text_tags(self):
-        r = Record("Alice")
+        r = _record("Alice")
         r.add_note("Buy milk", 7)
         r.notes[0].add_tag("personal")
         notes = _record_to_dict(r)["notes"]
-        assert len(notes) == 1
-        assert notes[0] == {"id": 7, "text": "Buy milk", "tags": ["personal"]}
+        assert notes == [{"id": 7, "text": "Buy milk", "tags": ["personal"]}]
 
     def test_notes_empty_list_when_none(self):
-        assert _record_to_dict(Record("Alice"))["notes"] == []
+        assert _record_to_dict(_record("Alice"))["notes"] == []
 
     def test_full_record_all_fields_present(self):
         d = _record_to_dict(self._full_record())
         assert d["name"] == "Alice"
         assert len(d["phones"]) == 2
-        assert d["email"] == "alice@example.com"
+        assert d["emails"] == ["alice@example.com"]
         assert d["birthday"] == "15.06.1990"
         assert d["address"] == "Kyiv, Main St 1"
         assert len(d["notes"]) == 2
 
 
+# =============================================================================
+# Export: _resolve_path
+# =============================================================================
+
 class TestResolvePath:
 
-    def test_relative_name_gets_extension_added(self, tmp_path):
+    def test_relative_name_gets_extension_and_export_dir(self, tmp_path, monkeypatch):
         import handlers.export_handlers as eh
-        original = eh.EXPORT_DIR
-        eh.EXPORT_DIR = str(tmp_path)
-        try:
-            result = _resolve_path("myfile", "json")
-            assert result.endswith(".json")
-        finally:
-            eh.EXPORT_DIR = original
+        monkeypatch.setattr(eh, "EXPORT_DIR", str(tmp_path))
+        result = _resolve_path("myfile", "json")
+        assert result.endswith(".json")
+        assert str(tmp_path) in result
 
-    def test_name_with_correct_extension_unchanged(self, tmp_path):
+    def test_name_with_correct_extension_unchanged(self, tmp_path, monkeypatch):
         import handlers.export_handlers as eh
-        original = eh.EXPORT_DIR
-        eh.EXPORT_DIR = str(tmp_path)
-        try:
-            result = _resolve_path("myfile.json", "json")
-            assert result.endswith("myfile.json")
-        finally:
-            eh.EXPORT_DIR = original
+        monkeypatch.setattr(eh, "EXPORT_DIR", str(tmp_path))
+        result = _resolve_path("myfile.json", "json")
+        assert result.endswith("myfile.json")
 
     def test_absolute_path_returned_as_is(self, tmp_path):
         abs_path = str(tmp_path / "out.json")
-        result = _resolve_path(abs_path, "json")
-        assert result == abs_path
-
-    def test_path_with_separator_returned_as_is(self, tmp_path):
-        path_with_sep = str(tmp_path / "sub" / "out")
-        result = _resolve_path(path_with_sep, "csv")
-        assert path_with_sep + ".csv" == result or result.startswith(str(tmp_path))
+        assert _resolve_path(abs_path, "json") == abs_path
 
 
 # =============================================================================
@@ -903,57 +1210,50 @@ class TestExportJson:
 
     def _book(self):
         book = AddressBook()
-        r = Record("Alice")
-        r.add_phone("1234567890")
+        r = _record("Alice", "1234567890")
         r.add_email("alice@example.com")
         r.add_birthday("15.06.1990")
         r.add_note("Task one", 1)
         r.notes[0].add_tag("work")
         book.add_record(r)
-        bob = Record("Bob")
-        bob.add_phone("0987654321")
-        book.add_record(bob)
+        book.add_record(_record("Bob", "0987654321"))
         return book
 
-    def test_creates_valid_json_file(self, tmp_path):
+    def test_creates_valid_json_list(self, tmp_path):
         path = str(tmp_path / "out.json")
         _export_json(self._book(), path)
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-        assert isinstance(data, list)
+        assert isinstance(json.loads(Path(path).read_text(encoding="utf-8")), list)
 
     def test_all_contacts_exported(self, tmp_path):
         path = str(tmp_path / "out.json")
         _export_json(self._book(), path)
-        data = json.loads(Path(path).read_text(encoding="utf-8"))
-        names = [r["name"] for r in data]
+        names = [r["name"] for r in json.loads(Path(path).read_text(encoding="utf-8"))]
         assert "Alice" in names and "Bob" in names
 
-    def test_phones_serialized_as_list(self, tmp_path):
+    def test_phones_and_emails_serialized_as_lists(self, tmp_path):
         path = str(tmp_path / "out.json")
         _export_json(self._book(), path)
-        alice = next(r for r in json.loads(Path(path).read_text()) if r["name"] == "Alice")
+        alice = next(r for r in json.loads(Path(path).read_text(encoding="utf-8")) if r["name"] == "Alice")
         assert alice["phones"] == ["1234567890"]
+        assert alice["emails"] == ["alice@example.com"]
 
     def test_notes_with_tags_serialized(self, tmp_path):
         path = str(tmp_path / "out.json")
         _export_json(self._book(), path)
-        alice = next(r for r in json.loads(Path(path).read_text()) if r["name"] == "Alice")
+        alice = next(r for r in json.loads(Path(path).read_text(encoding="utf-8")) if r["name"] == "Alice")
         assert alice["notes"][0]["text"] == "Task one"
         assert alice["notes"][0]["tags"] == ["work"]
 
-    def test_optional_fields_empty_string_when_not_set(self, tmp_path):
+    def test_optional_fields_empty_when_not_set(self, tmp_path):
         path = str(tmp_path / "out.json")
         _export_json(self._book(), path)
-        bob = next(r for r in json.loads(Path(path).read_text()) if r["name"] == "Bob")
-        assert bob["email"] == ""
+        bob = next(r for r in json.loads(Path(path).read_text(encoding="utf-8")) if r["name"] == "Bob")
+        assert bob["emails"] == []
         assert bob["birthday"] == ""
 
     def test_file_is_utf8_encoded(self, tmp_path):
         book = AddressBook()
-        r = Record("Олексій")
-        r.add_phone("1234567890")
-        book.add_record(r)
+        book.add_record(_record("Олексій", "1234567890"))
         path = str(tmp_path / "out.json")
         _export_json(book, path)
         data = json.loads(Path(path).read_text(encoding="utf-8"))
@@ -968,18 +1268,14 @@ class TestExportCsv:
 
     def _book_with_notes(self):
         book = AddressBook()
-        r = Record("Alice")
-        r.add_phone("1234567890")
-        r.add_phone("0987654321")
+        r = _record("Alice", "1234567890", "0987654321")
         r.add_email("alice@example.com")
         r.add_note("Task one", 1)
         r.notes[0].add_tag("work")
         r.notes[0].add_tag("urgent")
         r.add_note("Task two", 2)
         book.add_record(r)
-        bob = Record("Bob")
-        bob.add_phone("1111111111")
-        book.add_record(bob)
+        book.add_record(_record("Bob", "1111111111"))
         return book
 
     def _read_csv(self, path):
@@ -991,9 +1287,8 @@ class TestExportCsv:
         _export_csv(_make_book(("Alice", "1234567890")), path)
         with open(path, encoding="utf-8", newline="") as f:
             header = next(csv.reader(f))
-        expected = ["name", "phones", "email", "birthday", "address",
-                    "note_id", "note_text", "note_tags"]
-        assert header == expected
+        assert header == ["name", "phones", "email", "birthday", "address",
+                          "note_id", "note_text", "note_tags"]
 
     def test_contact_without_notes_writes_one_row(self, tmp_path):
         path = str(tmp_path / "out.csv")
@@ -1009,14 +1304,14 @@ class TestExportCsv:
         rows = [r for r in self._read_csv(path) if r["name"] == "Alice"]
         assert len(rows) == 2
 
-    def test_multiple_phones_joined_with_semicolon(self, tmp_path):
+    def test_multiple_phones_joined_in_one_cell(self, tmp_path):
         path = str(tmp_path / "out.csv")
         _export_csv(self._book_with_notes(), path)
         alice_row = next(r for r in self._read_csv(path) if r["name"] == "Alice")
         assert "1234567890" in alice_row["phones"]
         assert "0987654321" in alice_row["phones"]
 
-    def test_note_tags_joined_with_semicolon(self, tmp_path):
+    def test_note_tags_joined_in_one_cell(self, tmp_path):
         path = str(tmp_path / "out.csv")
         _export_csv(self._book_with_notes(), path)
         tagged = next(r for r in self._read_csv(path)
@@ -1039,52 +1334,39 @@ class TestExportCsv:
 class TestExportBookCommand:
 
     def test_empty_book_returns_message(self):
-        result = export_book(["json"], AddressBook())
-        assert "empty" in result.lower()
+        assert "empty" in export_book(["json"], AddressBook()).lower()
 
     def test_missing_format_returns_error(self):
-        book = _make_book(("Alice", "1234567890"))
-        result = export_book([], book)
-        assert "Error" in result
+        assert "Error" in export_book([], _make_book(("Alice", "1234567890")))
 
     def test_invalid_format_returns_error(self):
-        book = _make_book(("Alice", "1234567890"))
-        result = export_book(["xml"], book)
-        assert "Error" in result
+        assert "Error" in export_book(["xml"], _make_book(("Alice", "1234567890")))
 
     def test_export_json_to_custom_path(self, tmp_path):
-        book = _make_book(("Alice", "1234567890"))
         path = str(tmp_path / "contacts.json")
-        result = export_book(["json", path], book)
-        assert Path(path).exists()
-        assert "Alice" in result or "contacts" in result
+        export_book(["json", path], _make_book(("Alice", "1234567890")))
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         assert any(r["name"] == "Alice" for r in data)
 
     def test_export_csv_to_custom_path(self, tmp_path):
-        book = _make_book(("Alice", "1234567890"))
         path = str(tmp_path / "contacts.csv")
-        result = export_book(["csv", path], book)
-        assert Path(path).exists()
+        export_book(["csv", path], _make_book(("Alice", "1234567890")))
         rows = list(csv.DictReader(open(path, encoding="utf-8")))
         assert rows[0]["name"] == "Alice"
 
     def test_success_message_includes_contact_count(self, tmp_path):
-        book = _make_book(("Alice", "1234567890"), ("Bob", "0987654321"))
         path = str(tmp_path / "out.json")
-        result = export_book(["json", path], book)
+        result = export_book(["json", path], _make_book(("Alice", "1234567890"), ("Bob", "0987654321")))
         assert "2" in result
 
     def test_custom_path_without_extension_gets_extension_added(self, tmp_path):
-        book = _make_book(("Alice", "1234567890"))
         path_no_ext = str(tmp_path / "myexport")
-        export_book(["json", path_no_ext], book)
+        export_book(["json", path_no_ext], _make_book(("Alice", "1234567890")))
         assert Path(path_no_ext + ".json").exists()
 
     def test_export_json_produces_valid_structure(self, tmp_path):
-        book = _make_book(("Alice", "1234567890"))
         path = str(tmp_path / "out.json")
-        export_book(["json", path], book)
+        export_book(["json", path], _make_book(("Alice", "1234567890")))
         data = json.loads(Path(path).read_text(encoding="utf-8"))
         assert isinstance(data, list)
-        assert set(data[0].keys()) >= {"name", "phones", "email", "birthday", "address", "notes"}
+        assert set(data[0].keys()) >= {"name", "phones", "emails", "birthday", "address", "notes"}

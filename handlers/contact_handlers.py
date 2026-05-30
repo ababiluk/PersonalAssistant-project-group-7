@@ -97,7 +97,7 @@ def _add_contact_interactive(book: AddressBook):
     try:
         full_name = _get_mandatory_name()
         phone_input = _get_mandatory_phone()
-    except OperationCancelled:
+    except (OperationCancelled, FinishContactInput):
         return "Operation cancelled."
 
     record = book.find(full_name)
@@ -140,23 +140,6 @@ def _add_contact_interactive(book: AddressBook):
         return f"{message} Additional fields skipped."
 
     return f"{message} All details saved."
-
-
-@input_error
-def show_phone(args, book: AddressBook):
-
-    name = " ".join(args)
-    record = book.find(name)
-    if not record:
-        raise KeyError(name)
-    return "; ".join(str(p).value for p in record.phones)
-
-
-@input_error
-def show_all(args, book: AddressBook):
-    if not book.data:
-        return "No contacts saved."
-    return "\n".join(str(r) for r in book.data.values())
 
 
 @input_error
