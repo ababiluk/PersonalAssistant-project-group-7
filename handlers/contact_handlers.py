@@ -1,6 +1,7 @@
 from decorators import input_error
 from models import AddressBook, Record
 from handlers.display import show_paginated_table
+from handlers.exceptions import FinishContactInput, OperationCancelled
 from handlers.shared import (
     _validate_name,
     _split_name_and_value,
@@ -9,6 +10,8 @@ from handlers.shared import (
     _get_mandatory_phone,
     _get_optional_email,
     _get_optional_birthday,
+    _get_optional_note,
+    _get_optional_tags,
     _get_address_details,
 )
 
@@ -88,39 +91,53 @@ def _add_contact_quick(args, book: AddressBook):
 
 
 def _add_contact_interactive(book: AddressBook):
-    full_name = _get_mandatory_name()
+    # "cancel" at any mandatory prompt aborts; "cancel" at optional prompts saves
+    # what's already been entered (FinishContactInput) so data isn't lost.
+    print("Type 'cancel' at any optional step to stop and save what's entered.")
+    try:
+        full_name = _get_mandatory_name()
+        phone_input = _get_mandatory_phone()
+    except OperationCancelled:
+        return "Operation cancelled."
 
     record = book.find(full_name)
 
-    phone_input = _get_mandatory_phone()
+    try:
+        if not record:
+            record = Record(full_name)
+            record.add_phone(phone_input)
+            book.add_record(record)
+            message = f"Contact '{full_name}' created."
+        else:
+            phone_message = _handle_existing_contact(record, phone_input)
+            if phone_message is None:
+                return "Operation cancelled."
+            message = f"Contact '{full_name}' updated. {phone_message}"
 
-    if not record:
-        record = Record(full_name)
-        record.add_phone(phone_input)
-        book.add_record(record)
-        message = f"Contact '{full_name}' created."
-    else:
-        phone_message = _handle_existing_contact(record, phone_input)
+        email = _get_optional_email()
+        if email:
+            record.add_email(email)
+        birthday = _get_optional_birthday()
+        if birthday:
+            record.add_birthday(birthday)
 
-        if phone_message is None:
-            return "Operation cancelled."
-        message = f"Contact '{full_name}' updated. {phone_message}"
+        add_address = input("Add address? (y/n, or 'cancel' to stop): ").strip().lower()
+        if add_address in ["y", "yes"]:
+            address_string = _get_address_details()
+            if address_string:
+                record.add_address(address_string)
 
-    email = _get_optional_email()
-    birthday = _get_optional_birthday()
-    address_string = None
+        note_text = _get_optional_note()
+        if note_text:
+            from handlers.note_handlers import _next_note_id
+            note_id = _next_note_id(book)
+            record.add_note(note_text, note_id)
+            tags = _get_optional_tags()
+            for tag in tags:
+                record.notes[-1].add_tag(tag)
 
-    add_address = input("Add address? (y/n): ").strip().lower()
-
-    if add_address in ["y", "yes"]:
-        address_string = _get_address_details()
-
-    if email:
-        record.add_email(email)
-    if birthday:
-        record.add_birthday(birthday)
-    if address_string:
-        record.add_address(address_string)
+    except FinishContactInput:
+        return f"{message} Additional fields skipped."
 
     return f"{message} All details saved."
 

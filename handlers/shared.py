@@ -6,6 +6,14 @@ another, which previously caused a contact<->birthday cross-import.
 """
 
 from models import Phone, Email, Birthday
+from handlers.exceptions import FinishContactInput
+
+
+def _check_cancel(value):
+    # Allow the user to type "cancel" at any interactive prompt to stop gracefully
+    # instead of Ctrl+C, so already-entered data can be saved.
+    if value.strip().lower() == "cancel":
+        raise FinishContactInput()
 
 
 def _validate_name(name):
@@ -66,14 +74,12 @@ def _choose_from(items, render, prompt):
 
 def _get_mandatory_name():
     while True:
-        name_input = input("Enter name and surname: ").strip()
-
+        name_input = input("Enter name and surname (or 'cancel'): ").strip()
+        _check_cancel(name_input)
         full_name = name_input.title()
-
         if not full_name:
             print("Error: Name is mandatory.")
             continue
-
         error = _validate_name(full_name)
         if not error:
             return full_name
@@ -82,7 +88,8 @@ def _get_mandatory_name():
 
 def _get_mandatory_phone():
     while True:
-        phone = input("Enter phone (10 digits, mandatory): ").strip()
+        phone = input("Enter phone (10 digits, mandatory, or 'cancel'): ").strip()
+        _check_cancel(phone)
         if not phone:
             print("Error: Phone number is mandatory.")
             continue
@@ -95,11 +102,11 @@ def _get_mandatory_phone():
 
 def _get_optional_email():
     while True:
-        email = input("Enter email (optional): ").strip()
-
+        email = input("Enter email (optional, or 'cancel' to stop): ").strip()
+        if email.lower() == "cancel":
+            raise FinishContactInput()
         if not email:
             return None
-
         try:
             Email(email)
             return email
@@ -110,6 +117,7 @@ def _get_optional_email():
 def _get_mandatory_email():
     while True:
         email = input("Enter email: ").strip()
+        _check_cancel(email)
         if not email:
             print("Error: Email is mandatory.")
             continue
@@ -122,11 +130,11 @@ def _get_mandatory_email():
 
 def _get_optional_birthday():
     while True:
-        birthday = input("Enter birthday (DD.MM.YYYY, optional): ").strip()
-
+        birthday = input("Enter birthday (DD.MM.YYYY, optional, or 'cancel' to stop): ").strip()
+        if birthday.lower() == "cancel":
+            raise FinishContactInput()
         if not birthday:
             return None
-
         try:
             Birthday(birthday)
             return birthday
@@ -135,30 +143,56 @@ def _get_optional_birthday():
 
 
 def _get_address_details():
-    print("Address details:")
+    # Cancel at any field saves what was already entered instead of discarding it.
+    print("Address details (type 'cancel' at any step to stop and save):")
     while True:
         country = input("  Enter Country: ").strip()
+        if country.lower() == "cancel":
+            raise FinishContactInput()
         if country:
             break
-
         print("Error: Country is mandatory.")
     while True:
         city = input("  Enter City: ").strip()
+        if city.lower() == "cancel":
+            raise FinishContactInput()
         if city:
             break
-
         print("Error: City is mandatory.")
 
     street = input("  Enter Street: ").strip()
+    if street.lower() == "cancel":
+        return ", ".join(filter(None, [country, city]))
     house = input("  Enter House number: ").strip()
-
+    if house.lower() == "cancel":
+        return ", ".join(filter(None, [country, city, street]))
     apt = input("  Enter Apartment number (optional): ").strip()
+    if apt.lower() == "cancel":
+        return ", ".join(filter(None, [country, city, street, house]))
     zip_code = input("  Enter Zip code (optional): ").strip()
 
     address_parts = [country, city, street, house]
-    if apt:
+    if apt and apt.lower() != "cancel":
         address_parts.append(f"apt. {apt}")
-    if zip_code:
+    if zip_code and zip_code.lower() != "cancel":
         address_parts.append(zip_code)
 
     return ", ".join(filter(None, address_parts))
+
+
+def _get_optional_note():
+    # Prompted during interactive add so the user can attach a note in one flow.
+    note = input("Enter note (optional, or 'cancel' to stop): ").strip()
+    if note.lower() == "cancel":
+        raise FinishContactInput()
+    return note if note else None
+
+
+def _get_optional_tags():
+    # Comma-separated tags for the note collected during interactive add.
+    tags = input("Enter tags, comma-separated (optional, or 'cancel' to stop): ").strip()
+    if tags.lower() == "cancel":
+        raise FinishContactInput()
+    if not tags:
+        return []
+    return [tag.strip() for tag in tags.split(",") if tag.strip()]

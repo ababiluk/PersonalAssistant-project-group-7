@@ -1,6 +1,7 @@
 import functools
 
 
+# Handle common command errors and return user-friendly messages
 def input_error(func):
     # Wrap command handlers so expected user mistakes become a returned message
     # instead of a traceback that would crash the REPL loop. Each exception type
