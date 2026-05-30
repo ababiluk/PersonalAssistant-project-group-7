@@ -1,5 +1,8 @@
 import re
-from datetime import datetime
+from datetime import datetime, date
+
+MAX_NAME_LENGTH = 50
+MAX_ADDRESS_LENGTH = 100
 
 
 class Field:
@@ -10,10 +13,20 @@ class Field:
         return str(self.value)
 
 
-# No format rules enforced here by design: name checks currently live in the
-# input layer (shared._validate_name), not the model. See ТЗ validation gap.
+# Validation lives in the model so every Record gets the same rules whatever path
+# creates it. isalpha() keeps names letters-only (a deliberate choice — names
+# with hyphens/apostrophes are rejected).
 class Name(Field):
-    pass
+    def __init__(self, value):
+        value = value.strip()
+        if not value:
+            raise ValueError("Name is required.")
+        if len(value) > MAX_NAME_LENGTH:
+            raise ValueError(f"Name must be at most {MAX_NAME_LENGTH} characters.")
+        for part in value.split():
+            if not part.isalpha():
+                raise ValueError(f"'{part}' must contain only letters.")
+        super().__init__(value)
 
 
 class Phone(Field):
@@ -36,9 +49,13 @@ class Birthday(Field):
         # Keep a real date object (not the string) so AddressBook can do date
         # arithmetic for upcoming-birthday calculations.
         try:
-            self.value = datetime.strptime(value, "%d.%m.%Y").date()
+            parsed = datetime.strptime(value, "%d.%m.%Y").date()
         except ValueError:
             raise ValueError("Invalid date format. Use DD.MM.YYYY")
+        # A birthday in the future is always a typo, so reject it.
+        if parsed > date.today():
+            raise ValueError("Birthday cannot be in the future.")
+        self.value = parsed
 
     def __str__(self):
         return self.value.strftime("%d.%m.%Y")
@@ -46,15 +63,23 @@ class Birthday(Field):
 
 class Email(Field):
     def __init__(self, value):
-        pattern = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
+        # Require a letters-only TLD of length >= 2 so trailing dots/hyphens and
+        # bare domains (user@example.) are rejected.
+        pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         if not re.match(pattern, value):
             raise ValueError("Invalid email format. Example: user@example.com")
         super().__init__(value)
-        
 
-# Free-form text: no format rules (no address validation yet — ТЗ validation gap).
+
+# Free-form text, but length-capped so a stray paste can't bloat the record.
 class Address(Field):
-    pass
+    def __init__(self, value):
+        value = value.strip()
+        if not value:
+            raise ValueError("Address cannot be empty.")
+        if len(value) > MAX_ADDRESS_LENGTH:
+            raise ValueError(f"Address must be at most {MAX_ADDRESS_LENGTH} characters.")
+        super().__init__(value)
 
 
 class Note(Field):

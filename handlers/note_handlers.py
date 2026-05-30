@@ -1,8 +1,29 @@
 from decorators import input_error
 from models import AddressBook
 from rich.table import Table
+from rich.markup import escape
 from handlers.display import show_paginated_table
-from handlers.shared import _require_record, _choose_from
+from handlers.shared import _require_record, _choose_from, _choose_many
+
+_HIGHLIGHT = "black on yellow"
+
+
+def _highlight(text, query):
+    # Wrap every case-insensitive occurrence of query in rich highlight markup so
+    # search results show *where* the match is. The rest of the text is escaped so
+    # any brackets in a note aren't parsed as markup.
+    if not query:
+        return escape(text)
+    low = text.lower()
+    q = query.lower()
+    out = []
+    i = 0
+    while (j := low.find(q, i)) != -1:
+        out.append(escape(text[i:j]))
+        out.append(f"[{_HIGHLIGHT}]{escape(text[j:j + len(q)])}[/{_HIGHLIGHT}]")
+        i = j + len(q)
+    out.append(escape(text[i:]))
+    return "".join(out)
 
 
 def _next_note_id(book):
@@ -118,7 +139,7 @@ def edit_tag(args, book: AddressBook):
 
 @input_error
 def delete_tag(args, book: AddressBook):
-    # Delete-tag removes one specific tag; with several tags the user picks which.
+    # With one tag it's removed directly; with several the user can pick one or many.
     if not args:
         return "Error: Usage: delete-tag [contact name | note id]"
     record, note = _resolve_note(book, args)
@@ -128,14 +149,18 @@ def delete_tag(args, book: AddressBook):
         return f"Error: note #{note.id} has no tags."
 
     if len(note.tags) == 1:
-        tag = note.tags[0]
+        targets = [note.tags[0]]
     else:
-        tag = _choose_from(note.tags, lambda t: t, "Which tag to delete (number): ")
-        if tag is None:
+        targets = _choose_many(
+            note.tags, lambda t: t,
+            "Which tag(s) to delete (numbers, comma-separated, or 'all'): ",
+        )
+        if not targets:
             return "Operation cancelled."
 
-    note.remove_tag(tag)
-    return f"Tag '{tag}' removed from note #{note.id}."
+    for tag in targets:
+        note.remove_tag(tag)
+    return f"Removed {len(targets)} tag(s) from note #{note.id}."
 
 
 @input_error
@@ -148,7 +173,7 @@ def show_notes(args, book: AddressBook):
         return f"No notes for '{name}'."
 
     table = Table(title=f"Notes: {name}", header_style="bold cyan")
-    table.add_column("ID", style="dim", width=6)
+    table.add_column("Note ID", style="dim", width=8)
     table.add_column("Note", style="white")
     table.add_column("Tags", style="yellow")
 
@@ -206,7 +231,7 @@ def show_all_notes(args, book: AddressBook):
 
     columns = [
         ("Contact", {"style": "green"}),
-        ("ID", {"style": "dim", "width": 6}),
+        ("Note ID", {"style": "dim", "width": 8}),
         ("Note", {"style": "white"}),
         ("Tags", {"style": "yellow"}),
     ]
@@ -234,12 +259,20 @@ def find_notes(args, book: AddressBook):
 
     columns = [
         ("Contact", {"style": "green"}),
-        ("ID", {"style": "dim", "width": 6}),
+        ("Note ID", {"style": "dim", "width": 8}),
         ("Note", {"style": "white"}),
         ("Tags", {"style": "yellow"}),
     ]
-    rows = [(name, str(nid), text, ", ".join(tags) if tags else "—")
-            for name, nid, text, tags in results]
+    # Highlight the query inside the note text and tags so the match stands out.
+    rows = [
+        (
+            name,
+            str(nid),
+            _highlight(text, query),
+            _highlight(", ".join(tags), query) if tags else "—",
+        )
+        for name, nid, text, tags in results
+    ]
     return show_paginated_table(f"Notes matching '{query}'", columns, rows)
 
 
@@ -260,7 +293,7 @@ def find_by_tag(args, book: AddressBook):
 
     columns = [
         ("Contact", {"style": "green"}),
-        ("ID", {"style": "dim", "width": 6}),
+        ("Note ID", {"style": "dim", "width": 8}),
         ("Note", {"style": "white"}),
         ("Tags", {"style": "yellow"}),
     ]
@@ -285,7 +318,7 @@ def sort_by_tags(args, book: AddressBook):
 
     columns = [
         ("Contact", {"style": "green"}),
-        ("ID", {"style": "dim", "width": 6}),
+        ("Note ID", {"style": "dim", "width": 8}),
         ("Note", {"style": "white"}),
         ("Tags", {"style": "yellow"}),
     ]

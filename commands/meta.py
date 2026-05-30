@@ -26,17 +26,18 @@ COMMAND_META: dict[str, tuple[str, str, str]] = {
 
     "add":            ("[name] [phone]",       "Add by name (+optional phone), or 'add' alone for full interactive entry", "Contacts"),
     "show-contacts":  ("",                    "Show all contacts",                                  "Contacts"),
+    "show-contacts-full": ("",                "Show all contacts with all fields including notes",  "Contacts"),
     "find-contact":   ("[query]",              "Search contacts by name or phone",                   "Contacts"),
     "delete-contact": ("[name]",               "Delete a contact",                                   "Contacts"),
 
     "add-phone":      ("[name] [phone]",       "Add a phone to a contact (prompts if no number)",    "Phones"),
-    "edit-phone":     ("[name] [old] [new]",   "Change phone number",                                "Phones"),
+    "edit-phone":     ("[name]",               "Edit a phone (choose if several)",                   "Phones"),
     "show-phone":     ("[name]",               "Show phone number(s)",                               "Phones"),
-    "delete-phone":   ("[name] [phone]",       "Remove a phone (prompts/auto-picks if no number)",   "Phones"),
+    "delete-phone":   ("[name] [phone]",       "Remove phone(s) - pick one or many if several",      "Phones"),
 
     "add-email":      ("[name] [email]",       "Add an email to a contact (prompts if none)",        "Emails"),
     "edit-email":     ("[name]",               "Edit an email (choose if several)",                  "Emails"),
-    "delete-email":   ("[name] [email]",       "Remove an email (prompts/auto-picks if none)",       "Emails"),
+    "delete-email":   ("[name] [email]",       "Remove email(s) - pick one or many if several",      "Emails"),
 
     "add-birthday":   ("[name] [DD.MM.YYYY]",  "Add birthday",                                       "Birthdays"),
     "edit-birthday":  ("[name] [DD.MM.YYYY]",  "Edit birthday",                                      "Birthdays"),
@@ -53,12 +54,11 @@ COMMAND_META: dict[str, tuple[str, str, str]] = {
     "delete-note":    ("[name|id]",            "Delete a note (by note id or contact)",              "Notes"),
     "show-notes":     ("[name]",               "Show all notes for a contact",                       "Notes"),
     "show-all-notes": ("",                    "Show all notes across all contacts",                 "Notes"),
-    "show-contacts-full": ("",                "Show all contacts with all fields including notes",  "Notes"),
     "find-notes":     ("[query]",              "Search notes across all contacts",                   "Notes"),
 
     "add-tag":        ("[name|id]",            "Add tag(s) to a note, comma-separated",              "Tags"),
     "edit-tag":       ("[name|id]",            "Replace a note's whole tag list",                    "Tags"),
-    "delete-tag":     ("[name|id]",            "Remove one tag from a note (choose if several)",     "Tags"),
+    "delete-tag":     ("[name|id]",            "Remove tag(s) from a note - pick one or many",       "Tags"),
     "find-by-tag":    ("[tag]",                "Search notes by a specific tag",                     "Tags"),
     "show-notes-by-tag":("",                   "Show all notes grouped by tags",                     "Tags"),
 

@@ -29,9 +29,7 @@ def main():
                 print("Good bye!")
                 break
 
-            target_command = get_validated_command(
-                command, available_commands, args, book
-            )
+            target_command = get_validated_command(command, available_commands)
 
             if target_command:
                 handler = commands.get(target_command)

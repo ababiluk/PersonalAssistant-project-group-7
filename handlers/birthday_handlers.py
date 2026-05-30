@@ -3,9 +3,10 @@ from models import AddressBook, Birthday
 from handlers.shared import _require_record, _split_name_and_value
 
 
-def _prompt_birthday():
+def _prompt_birthday(prompt="Enter birthday (DD.MM.YYYY): "):
+    # Prompt is parameterized so edit-birthday can ask for the "new birthday".
     while True:
-        value = input("Enter birthday (DD.MM.YYYY): ").strip()
+        value = input(prompt).strip()
         try:
             Birthday(value)
             return value
@@ -41,7 +42,7 @@ def edit_birthday(args, book: AddressBook):
     if not record.birthday:
         return f"Error: '{name}' has no birthday. Use add-birthday."
     if bday is None:
-        bday = _prompt_birthday()
+        bday = _prompt_birthday("Enter new birthday (DD.MM.YYYY): ")
     record.add_birthday(bday)
     return f"Birthday updated to {bday} for '{name}'."
 

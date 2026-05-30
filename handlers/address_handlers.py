@@ -1,5 +1,6 @@
 from decorators import input_error
 from models import AddressBook
+from handlers.exceptions import FinishContactInput, OperationCancelled
 from handlers.shared import _require_record, _get_address_details
 
 
@@ -13,7 +14,13 @@ def add_address(args, book: AddressBook):
     record = _require_record(book, name)
     if record.address:
         return f"Error: '{name}' already has an address. Use edit-address."
-    record.add_address(_get_address_details())
+    # Catch cancel here: outside the interactive add flow there's no enclosing
+    # handler to absorb it, so an uncaught cancel would crash the app.
+    try:
+        address = _get_address_details()
+    except (FinishContactInput, OperationCancelled):
+        return "Operation cancelled."
+    record.add_address(address)
     return f"Address added to '{name}'."
 
 
@@ -26,7 +33,11 @@ def edit_address(args, book: AddressBook):
     record = _require_record(book, name)
     if not record.address:
         return f"Error: '{name}' has no address. Use add-address."
-    record.add_address(_get_address_details())
+    try:
+        address = _get_address_details()
+    except (FinishContactInput, OperationCancelled):
+        return "Operation cancelled."
+    record.add_address(address)
     return f"Address updated for '{name}'."
 
 
