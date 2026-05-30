@@ -33,6 +33,7 @@ class CommandCompleter(Completer):
                     display_meta=display_meta,
                 )
 
+
 # Create interactive prompt session with history and autocomplete
 def create_session() -> PromptSession:
     return PromptSession(

@@ -12,7 +12,7 @@ class Record:
 
     def add_phone(self, phone):
         self.phones.append(Phone(phone))
-    
+
     def add_address(self, address):
         self.address = Address(address)
 
@@ -80,4 +80,7 @@ class Record:
         address = str(self.address) if self.address else "N/A"
 
         phones = "; ".join(p.value for p in self.phones) if self.phones else "No phones"
-        return f"Contact name: {self.name.value}, phones: {phones}, birthday: {birthday}, email: {email}, Address: {address}"
+        return (
+            f"Contact name: {self.name.value}, phones: {phones}, "
+            f"birthday: {birthday}, email: {email}, Address: {address}"
+        )
