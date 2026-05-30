@@ -50,3 +50,17 @@ class AddressBook(UserDict):
                 )
 
         return upcoming
+    # Rename contact and update dictionary key
+    def rename_contact(self, old_name, new_name):
+        record = self.find(old_name)
+
+        if not record:
+            raise KeyError(old_name)
+
+        if new_name in self.data:
+            raise ValueError(f"Contact '{new_name}' already exists.")
+
+        record.edit_name(new_name)
+
+        self.data[new_name] = record
+        del self.data[old_name]

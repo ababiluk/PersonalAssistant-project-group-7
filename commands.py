@@ -7,6 +7,7 @@ from handlers.contact_handlers import (
     add_email,
     edit_email,
     delete_email,
+    rename_contact,
 )
 from handlers.birthday_handlers import (
     add_birthday,
@@ -44,6 +45,7 @@ commands = {
     "change": change_contact,
     "phone": display_phone,
     "all": display_all,
+    "rename-contact": rename_contact,
     "delete-contact": delete_contact,
     "delete-phone": remove_phone,
     "add-birthday": add_birthday,

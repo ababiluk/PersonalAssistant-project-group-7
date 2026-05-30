@@ -22,13 +22,18 @@ import re
 # 4. Save entered information
 @input_error
 def add_contact(args, book: AddressBook):
-    print("Type 'cancel' at any stage to finish contact creation and save entered data.")
-    try:
+    print(
+        "Type 'cancel' at any stage to finish contact creation and save entered data."
+    )
+    if len(args) >= 2:
+        phone_input = args[-1]
+        full_name = " ".join(args[:-1])
+    else:
         full_name = _get_mandatory_name()
-
+        phone_input = _get_mandatory_phone()
+    try:
         record = book.find(full_name)
 
-        phone_input = _get_mandatory_phone()
         # Find existing contact or create a new one
         if not record:
             record = Record(full_name)
@@ -62,10 +67,12 @@ def add_contact(args, book: AddressBook):
         note_text = _get_optional_note()
 
         if note_text:
-            note_id = max(
-                [note.id for r in book.data.values() for note in r.notes],
-                default=0
-            ) + 1
+            note_id = (
+                max(
+                    [note.id for r in book.data.values() for note in r.notes], default=0
+                )
+                + 1
+            )
 
             record.add_note(note_text, note_id)
 
@@ -134,7 +141,8 @@ def remove_phone(args, book: AddressBook):  # remove specific phone from contact
 
 @input_error
 def add_email(args, book: AddressBook):  # adding email to existing contact
-    name, email = args
+    email = args[-1]
+    name = " ".join(args[:-1])
     record = book.find(name)
     if not record:
         raise KeyError(name)
@@ -146,11 +154,12 @@ def add_email(args, book: AddressBook):  # adding email to existing contact
 def edit_email(args, book: AddressBook):  # editing email for existing contact
     if len(args) < 2:
         return "Error: Usage: edit-email [name] [new_email]"
-    name, new_email = args
+    new_email = args[-1]
+    name = " ".join(args[:-1])
     record = book.find(name)
     if not record:
         raise KeyError(name)
-    record.add_email(new_email)  # method add_email usually overwrites the old one
+    record.edit_email(new_email)
     return f"Email for '{name}' updated to {new_email}."
 
 
@@ -158,14 +167,14 @@ def edit_email(args, book: AddressBook):  # editing email for existing contact
 def delete_email(args, book: AddressBook):  # removing email from contact
     if not args:
         return "Error: Usage: delete-email [name]"
-    name = args[0]
+    name = " ".join(args)
     record = book.find(name)
     if not record:
         raise KeyError(name)
     if not record.email:
         return f"Contact '{name}' doesn't have an email to delete."
-    
-    record.email = None  # simply clear the field
+
+    record.delete_email()
     return f"Email for '{name}' deleted."
 
 
@@ -193,9 +202,8 @@ def find_contact(args, book: AddressBook):  # finding contact by name or phone
         ("Email", {}),
         ("Birthday", {}),
         ("Address", {}),
-        ("Notes",{}),
-        ("Tags",{})
-
+        ("Notes", {}),
+        ("Tags", {}),
     ]
     rows = []
     for record in found_records:
@@ -205,12 +213,21 @@ def find_contact(args, book: AddressBook):  # finding contact by name or phone
         address = str(record.address) if record.address else "—"
         notes = "; ".join(note.value for note in record.notes) if record.notes else "—"
 
-        tags = "; ".join(
-            tag
-            for note in record.notes
-            for tag in note.tags
-        ) if record.notes else "—"
-        rows.append((record.name.value, phones, email, birthday, address, notes,tags))
-        
+        tags = (
+            "; ".join(tag for note in record.notes for tag in note.tags)
+            if record.notes
+            else "—"
+        )
+        rows.append((record.name.value, phones, email, birthday, address, notes, tags))
 
     return show_paginated_table(f"Search Results for '{args[0]}'", columns, rows)
+
+
+@input_error
+def rename_contact(args, book: AddressBook):
+    old_name = input("Enter current contact name: ").strip()
+    new_name = input("Enter new contact name: ").strip()
+
+    book.rename_contact(old_name, new_name)
+
+    return f"Contact renamed to '{new_name}'."

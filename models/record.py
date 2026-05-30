@@ -11,6 +11,10 @@ class Record:
         self.address = None
         self.notes = []
 
+    # Change contact name
+    def edit_name(self, new_name):
+        self.name = Name(new_name)
+
     # Add a new phone number to the contact
     def add_phone(self, phone):
         self.phones.append(Phone(phone))
@@ -43,9 +47,25 @@ class Record:
     def add_birthday(self, birthday):
         self.birthday = Birthday(birthday)
 
+    # Edit birthday information
+    def edit_birthday(self, birthday):
+        self.add_birthday(birthday)
+
+    # Remove birthday information
+    def delete_birthday(self):
+        self.birthday = None
+
     # Add email information
     def add_email(self, email):
         self.email = Email(email)
+
+    # Edit email information
+    def edit_email(self, email):
+        self.add_email(email)
+
+    # Remove email information
+    def delete_email(self):
+        self.email = None
 
     # Create and attach a new note
     def add_note(self, text, note_id):

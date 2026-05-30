@@ -16,7 +16,7 @@ COMMAND_META: dict[str, tuple[str, str]] = {
     "show-birthday":  ("[name]",               "Show birthday"),
     "birthdays":      ("[days]",               "Upcoming birthdays (default: 7 days)"),
     "find":           ("[query]",              "Search contacts by name or phone"),
-    "add-note":       ("[name] [text]",        "Add a note to a contact"),
+    "add-note":       ("[name] | [text]",      "Add a note to a contact"),
     "edit-note":      ("[name]",               "Edit a note by ID"),
     "delete-note":    ("[name]",               "Delete a note by ID"),
     "show-notes":     ("[name]",               "Show all notes for a contact"),

@@ -3,7 +3,6 @@ from models import AddressBook
 from rich.table import Table
 from rich.console import Console
 
-
 console = Console()
 
 
@@ -29,14 +28,31 @@ def _print_notes_table(record):
 @input_error
 def add_note(args, book: AddressBook):
     if not args:
-        return "Error: Usage: add-note [name] [text]"
-    name = args[0]
+        return (
+            "Usage: add-note [name] | [text]\n"
+            "Example: add-note John Smith | likes red wine"
+        )
+
+    full_input = " ".join(args)
+
+    if "|" not in full_input:
+        return "Error: Use format: add-note [name] | [text]"
+
+    name, text = full_input.split("|", 1)
+
+    name = name.strip()
+    text = text.strip()
+    
+    if not name:
+        return "Error: Contact name cannot be empty."
+
+    if not text:
+        return "Error: Note text cannot be empty."
+
     record = book.find(name)
     if not record:
         return f"Error: Contact '{name}' not found."
-    if len(args) < 2:
-        return "Error: Usage: add-note [name] [text]"
-    text = " ".join(args[1:])
+
     note_id = _next_note_id(book)
     record.add_note(text, note_id)
     return f"Note #{note_id} added to '{name}'."

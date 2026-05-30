@@ -9,6 +9,7 @@ from .contact_handlers import (
     remove_phone,
     find_contact,
     add_email,
+    rename_contact,
 )
 
 from .display import (
