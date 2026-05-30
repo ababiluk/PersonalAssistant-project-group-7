@@ -1,5 +1,5 @@
 from handlers.command_hints import create_session
-from handlers.display import _print
+from handlers.display import _print, show_help
 from commands import commands
 from handlers import parse_input, save_data, load_data, get_validated_command
 
@@ -9,6 +9,9 @@ def main():
     _print(
         "[bold cyan]Welcome to the assistant bot![/bold cyan] Type [green]help[/green] for the command list."
     )
+    # Show the command list up front so new users see what's available without
+    # having to know that "help" exists.
+    _print(show_help([], book))
     session = create_session()
     available_commands = list(commands.keys())
     while True:

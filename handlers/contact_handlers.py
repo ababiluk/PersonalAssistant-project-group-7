@@ -139,6 +139,55 @@ def _get_address_details():
 
 @input_error
 def add_contact(args, book: AddressBook):
+    # Two entry styles so users aren't forced through every prompt: passing a
+    # name does a quick add, while a bare "add" keeps the guided interactive flow.
+    if args:
+        return _add_contact_quick(args, book)
+    return _add_contact_interactive(book)
+
+
+def _split_name_and_phone(args):
+    # A name may be several words, so we can't assume a fixed position for the
+    # phone: the trailing token is a phone only when it carries digits (names
+    # never do, since _validate_name forbids them).
+    # Returns (name_parts: list[str], phone: str | None).
+    if len(args) >= 2 and any(ch.isdigit() for ch in args[-1]):
+        return args[:-1], args[-1]
+    return args, None
+
+
+def _add_contact_quick(args, book: AddressBook):
+    # One-line entry: a name alone registers someone to flesh out later, and an
+    # optional trailing phone makes the contact immediately usable without the
+    # full interactive flow.
+    # args: tokens after "add"; book: the address book. Returns a status string.
+    name_parts, phone = _split_name_and_phone(args)
+    full_name = " ".join(name_parts).title()
+
+    error = _validate_name(full_name)
+    if error:
+        return error
+
+    # An existing name is left untouched: quick-add only creates, so the user is
+    # told it exists rather than silently mutating a contact they may not mean.
+    if book.find(full_name):
+        return f"Error: Contact '{full_name}' already exists."
+
+    record = Record(full_name)
+    if phone:
+        # Validate the phone before storing the record so a bad number can't
+        # leave an orphan empty contact behind.
+        record.add_phone(phone)
+    book.add_record(record)
+
+    return (
+        f"Contact '{full_name}' created with phone {phone}."
+        if phone
+        else f"Contact '{full_name}' created."
+    )
+
+
+def _add_contact_interactive(book: AddressBook):
     full_name = _get_mandatory_name()
 
     record = book.find(full_name)

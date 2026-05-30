@@ -2,7 +2,7 @@ COMMAND_META: dict[str, tuple[str, str]] = {
     #  command           args hint              description
     "hello":          ("",                    "Greet the bot"),
     "help":           ("",                    "Show all available commands"),
-    "add":            ("[name] [phone]",       "Add or update a contact"),
+    "add":            ("[name] [phone]",       "Add by name (+optional phone), or 'add' alone for full interactive entry"),
     "change":         ("[name] [old] [new]",   "Change phone number"),
     "phone":          ("[name]",               "Show phone number(s)"),
     "all":            ("",                    "Show all contacts"),
