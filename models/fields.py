@@ -40,7 +40,7 @@ class Phone(Field):
 
     def __str__(self):
         # Render the bare digits as a Ukrainian-formatted number for display only.
-        v=self.value
+        v = self.value
         return f"+38({v[:3]}){v[3:6]}-{v[6:8]}-{v[8:]}"
 
 

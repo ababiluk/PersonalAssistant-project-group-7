@@ -24,7 +24,7 @@ def paginate(items, page_size=15):
     # Yield successive page_size-sized chunks so large tables can be shown one
     # page at a time instead of flooding the console.
     for i in range(0, len(items), page_size):
-        yield items[i : i + page_size]
+        yield items[i:i + page_size]
 
 
 def show_paginated_table(title, columns, rows, page_size=15):

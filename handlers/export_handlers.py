@@ -47,7 +47,10 @@ def _export_json(book, filepath):
 def _export_csv(book, filepath):
     # CSV is flat, so multi-valued fields are joined into one cell and a contact
     # with several notes becomes several rows (one per note) to avoid losing any.
-    fieldnames = ["name", "phones", "email", "birthday", "address", "note_id", "note_text", "note_tags"]
+    fieldnames = [
+        "name", "phones", "email", "birthday",
+        "address", "note_id", "note_text", "note_tags",
+    ]
     with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()

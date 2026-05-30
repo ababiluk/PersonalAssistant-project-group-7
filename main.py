@@ -9,7 +9,8 @@ def main():
     # persist on disk); a missing file just yields an empty book.
     book = load_data()
     _print(
-        "[bold cyan]Welcome to the assistant bot![/bold cyan] Type [green]help[/green] for the command list."
+        "[bold cyan]Welcome to the assistant bot![/bold cyan] "
+        "Type [green]help[/green] for the command list."
     )
     # Show the command list up front so new users see what's available without
     # having to know that "help" exists.
