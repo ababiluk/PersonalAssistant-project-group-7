@@ -44,8 +44,8 @@ def add_note(args, book: AddressBook):
     text = text.strip()
     
     if not name:
-    return "Error: Contact name cannot be empty."
-  
+        return "Error: Contact name cannot be empty."
+
     if not text:
         return "Error: Note text cannot be empty."
 
