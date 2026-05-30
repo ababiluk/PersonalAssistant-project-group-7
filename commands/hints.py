@@ -18,6 +18,8 @@ _STYLE = Style.from_dict({
 class CommandCompleter(Completer):
     def get_completions(self, document, _complete_event):
         text = document.text_before_cursor.lstrip().lower()
+        # Only complete the command word itself; once the user types a space they
+        # are entering arguments, which we can't meaningfully suggest.
         if " " in text:
             return
         for cmd, (args, desc, _group) in COMMAND_META.items():

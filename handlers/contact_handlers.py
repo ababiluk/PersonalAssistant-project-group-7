@@ -13,9 +13,9 @@ from handlers.shared import (
 )
 
 
-def _handle_existing_contact(
-    record, new_phone
-):  # interactive prompt when contact already exists
+def _handle_existing_contact(record, new_phone):
+    # During interactive add a name collision isn't an error: let the user add
+    # the number as a new phone, replace an existing one, or cancel.
     print(f"Contact '{record.name.value}' already exists.")
 
     if record.phones:
@@ -126,7 +126,7 @@ def _add_contact_interactive(book: AddressBook):
 
 
 @input_error
-def show_phone(args, book: AddressBook):  # showing existing contact phones
+def show_phone(args, book: AddressBook):
 
     name = " ".join(args)
     record = book.find(name)
@@ -136,14 +136,14 @@ def show_phone(args, book: AddressBook):  # showing existing contact phones
 
 
 @input_error
-def show_all(args, book: AddressBook):  # show all contacts
+def show_all(args, book: AddressBook):
     if not book.data:
         return "No contacts saved."
     return "\n".join(str(r) for r in book.data.values())
 
 
 @input_error
-def delete_contact(args, book: AddressBook):  # delete contact from address book
+def delete_contact(args, book: AddressBook):
     name = args[0]
     record = _require_record(book, name)
     book.delete(record.name.value)
@@ -151,7 +151,9 @@ def delete_contact(args, book: AddressBook):  # delete contact from address book
 
 
 @input_error
-def find_contact(args, book: AddressBook):  # finding contact by name or phone
+def find_contact(args, book: AddressBook):
+    # Match the query as a substring of either the name or any phone number, so
+    # one search covers both ways people look a contact up.
     search_query = args[0].lower()
     found_records = []
 

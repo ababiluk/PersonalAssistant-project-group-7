@@ -5,7 +5,9 @@ from handlers import parse_input, save_data, load_data, get_validated_command
 
 
 def main():
-    book = load_data()  # getting data from file on load
+    # Restore previously saved contacts so data survives between runs (ТЗ: must
+    # persist on disk); a missing file just yields an empty book.
+    book = load_data()
     _print(
         "[bold cyan]Welcome to the assistant bot![/bold cyan] Type [green]help[/green] for the command list."
     )
@@ -22,6 +24,7 @@ def main():
 
             command, *args = parse_input(user_input)
             if command in ["close", "exit"]:
+                # Persist only on a clean exit so the latest changes are saved.
                 save_data(book)
                 print("Good bye!")
                 break
@@ -38,6 +41,8 @@ def main():
                     _print(result)
 
         except KeyboardInterrupt:
+            # Ctrl+C aborts the current command only, keeping the app alive so an
+            # accidental interrupt doesn't drop the session (use close/exit to quit).
             print("\nCommand has been interrupted. Try again.")
             continue
 

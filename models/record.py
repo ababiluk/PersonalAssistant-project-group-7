@@ -17,9 +17,11 @@ class Record:
         self.address = Address(address)
 
     def remove_phone(self, phone):
-        if not self.find_phone(phone):  # check phone exists first
+        # Raise on a missing phone so the caller gets clear feedback instead of a
+        # silent no-op that looks like success.
+        if not self.find_phone(phone):
             raise ValueError(f"There is no such phone to remove: {phone}")
-        self.phones = [p for p in self.phones if p.value != phone]  # remove if phone exists
+        self.phones = [p for p in self.phones if p.value != phone]
 
     def edit_phone(self, old_phone, new_phone):
         phone_obj = self.find_phone(old_phone)
@@ -80,7 +82,7 @@ class Record:
         raise IndexError(f"Note with id {note_id} not found.")
 
     def add_tag_to_note(self, note_id, tag):
-        for note in self.notes:  # find note by ID and add tag
+        for note in self.notes:
             if note.id == note_id:
                 note.add_tag(tag)
                 return

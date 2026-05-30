@@ -1,3 +1,9 @@
+"""Single source of truth for command names, arg hints, descriptions and groups.
+
+Both the help table (show_help) and the autocompletion (CommandCompleter) read
+from here, so adding/renaming a command only needs an edit in one place.
+"""
+
 # Display order of help sections; show_help renders groups in this sequence.
 GROUP_ORDER = [
     "General",

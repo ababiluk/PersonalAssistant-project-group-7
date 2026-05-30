@@ -8,6 +8,8 @@ console = Console()
 
 
 def _next_note_id(book):
+    # IDs are unique across the whole book (not per contact) so a note can be
+    # referenced unambiguously; take max-so-far + 1 to avoid reusing a deleted id.
     all_ids = [note.id for record in book.data.values() for note in record.notes]
     return max(all_ids, default=0) + 1
 
@@ -16,7 +18,7 @@ def _print_notes_table(record):
     table = Table(header_style="bold cyan")
     table.add_column("ID", style="dim", width=6)
     table.add_column("Note", style="white")
-    table.add_column("Tags", style="yellow")  # add Tags column
+    table.add_column("Tags", style="yellow")
     for note in record.notes:
         tags_str = ", ".join(note.tags) if note.tags else "—"
         table.add_row(str(note.id), note.value, tags_str)
@@ -84,7 +86,6 @@ def delete_note(args, book: AddressBook):
 
 @input_error
 def add_tag(args, book: AddressBook):
-    # command to attach a tag to a specific note
     if not args:
         return "Error: Usage: add-tag [name]"
     name = args[0]
@@ -126,7 +127,7 @@ def show_notes(args, book: AddressBook):
     table = Table(title=f"Notes: {name}", header_style="bold cyan")
     table.add_column("ID", style="dim", width=6)
     table.add_column("Note", style="white")
-    table.add_column("Tags", style="yellow")  # add Tags column
+    table.add_column("Tags", style="yellow")
     
     for note in record.notes:
         tags_str = ", ".join(note.tags) if note.tags else "—"
@@ -197,7 +198,7 @@ def find_notes(args, book: AddressBook):
 
     for record in book.data.values():
         for note in record.notes:
-            # search in text and in tags
+            # Match against both text and tags so a tag-only hit still surfaces the note.
             in_text = query in note.value.lower()
             in_tags = any(query == t.lower() for t in note.tags)
             
@@ -220,7 +221,6 @@ def find_notes(args, book: AddressBook):
 
 @input_error
 def find_by_tag(args, book: AddressBook):
-    # filter notes by a specific tag
     if not args:
         return "Error: Usage: find-by-tag [tag]"
     tag_query = args[0].lower()
@@ -247,7 +247,6 @@ def find_by_tag(args, book: AddressBook):
 
 @input_error
 def sort_by_tags(args, book: AddressBook):
-    # group and sort notes by tags alphabetically
     results = []
     for record in book.data.values():
         for note in record.notes:
@@ -257,6 +256,7 @@ def sort_by_tags(args, book: AddressBook):
     if not results:
         return "No notes with tags found."
 
+    # Order by the first tag (case-insensitive) so notes group under the same tag.
     results.sort(key=lambda x: x[3][0].lower())
 
     columns = [

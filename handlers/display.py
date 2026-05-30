@@ -9,6 +9,8 @@ console = Console()
 
 
 def _print(result):
+    # Highlight error strings in red, but pass anything else through untouched so
+    # rich renderables (e.g. tables) keep their own formatting.
     if isinstance(result, str) and result.startswith("Error"):
         console.print(f"[bold red]{result}[/bold red]")
     else:
@@ -16,18 +18,18 @@ def _print(result):
 
 
 def paginate(items, page_size=15):
-    """Generator that yields successive page_size-sized chunks from items."""
+    # Yield successive page_size-sized chunks so large tables can be shown one
+    # page at a time instead of flooding the console.
     for i in range(0, len(items), page_size):
         yield items[i : i + page_size]
 
 
 def show_paginated_table(title, columns, rows, page_size=15):
-    """Display a table with automatic pagination when rows exceed page_size.
-
-    columns: list of (header, kwargs) tuples passed to table.add_column
-    rows: list of string tuples passed to table.add_row
-    Returns a Table when no pagination is needed, None when printing directly.
-    """
+    # Paginate only when needed: small results are returned as a Table for the
+    # caller to print, while long lists are printed here page by page so they
+    # don't scroll off-screen.
+    # columns: list of (header, kwargs) for add_column; rows: list of string tuples.
+    # Returns a Table when it fits on one page, or None when it paginated itself.
     if len(rows) <= page_size:
         table = Table(title=title, header_style="bold cyan")
         for header, kwargs in columns:
@@ -59,7 +61,7 @@ def show_paginated_table(title, columns, rows, page_size=15):
 
 
 @input_error
-def display_all(args, book: AddressBook):  # show all contacts as table
+def display_all(args, book: AddressBook):
     if not book.data:
         return "No contacts saved."
 
@@ -82,7 +84,7 @@ def display_all(args, book: AddressBook):  # show all contacts as table
 
 
 @input_error
-def display_phone(args, book: AddressBook):  # show contact phones as table
+def display_phone(args, book: AddressBook):
     name = " ".join(args)
     record = book.find(name)
     if not record:
@@ -99,7 +101,7 @@ def display_phone(args, book: AddressBook):  # show contact phones as table
 
 
 @input_error
-def display_birthday(args, book: AddressBook):  # show contact birthday as table
+def display_birthday(args, book: AddressBook):
     name = args[0]
     record = book.find(name)
     if not record:
@@ -116,7 +118,7 @@ def display_birthday(args, book: AddressBook):  # show contact birthday as table
 
 
 @input_error
-def display_birthdays(args, book: AddressBook):  # show upcoming birthdays as table
+def display_birthdays(args, book: AddressBook):
     days = int(args[0]) if args else 7
     upcoming = book.get_upcoming_birthdays(days=days)
     if not upcoming:
@@ -152,7 +154,9 @@ _REPEAT_GREETINGS = [
 _hello_count = 0
 
 
-def hello_message(_args, _book):  # greeting message from the bot
+def hello_message(_args, _book):
+    # Count greetings so a repeat "hello" gets a playful variant instead of the
+    # same line again — a small touch of personality.
     global _hello_count
     _hello_count += 1
     if _hello_count > 1:

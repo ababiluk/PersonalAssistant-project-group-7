@@ -14,6 +14,10 @@ class AddressBook(UserDict):
             del self.data[name]
 
     def get_upcoming_birthdays(self, days=7):
+        # Find contacts to congratulate within the next `days` days.
+        # Accepts the look-ahead window in days. Returns a list of
+        # {"name", "congratulation_date" (DD.MM.YYYY)} dicts, where birthdays
+        # landing on a weekend are moved to the following Monday.
         today = date.today()
         upcoming = []
 
@@ -21,14 +25,17 @@ class AddressBook(UserDict):
             if not record.birthday:
                 continue
 
-            birthday_this_year = record.birthday.value.replace(year=today.year)  # changing year to current to compare only days
+            # Compare on this year's date so only month/day matter, not the year born.
+            birthday_this_year = record.birthday.value.replace(year=today.year)
 
-            if birthday_this_year < today:  # moving past birthdays to next year
+            # Already passed this year -> the next occurrence is next year.
+            if birthday_this_year < today:
                 birthday_this_year = birthday_this_year.replace(year=today.year + 1)
 
-            days_until = (birthday_this_year - today).days  # main calculation
+            days_until = (birthday_this_year - today).days
 
-            if 0 <= days_until <= days:  # weekends checks
+            if 0 <= days_until <= days:
+                # Weekend birthdays are greeted on the next working day (Monday).
                 if birthday_this_year.weekday() == 5:
                     congrats_date = birthday_this_year + timedelta(days=2)
                 elif birthday_this_year.weekday() == 6:

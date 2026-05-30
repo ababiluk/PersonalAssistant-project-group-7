@@ -30,6 +30,8 @@ def _default_filename(fmt):
 def _resolve_path(filename, fmt):
     if not filename.endswith(f".{fmt}"):
         filename += f".{fmt}"
+    # A bare filename goes into a dedicated EXPORT_DIR to keep the repo root tidy;
+    # a path-like value is honoured as-is so users can export anywhere.
     if os.path.isabs(filename) or os.sep in filename or "/" in filename:
         return filename
     os.makedirs(EXPORT_DIR, exist_ok=True)
@@ -43,6 +45,8 @@ def _export_json(book, filepath):
 
 
 def _export_csv(book, filepath):
+    # CSV is flat, so multi-valued fields are joined into one cell and a contact
+    # with several notes becomes several rows (one per note) to avoid losing any.
     fieldnames = ["name", "phones", "email", "birthday", "address", "note_id", "note_text", "note_tags"]
     with open(filepath, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -76,6 +80,8 @@ def export_book(args, book: AddressBook):
     if fmt not in ("csv", "json"):
         return "Error: Usage: export-book [csv|json] [optional: path/filename]"
 
+    # Honour an explicit path/filename if given; otherwise fall back to a
+    # timestamped name in EXPORT_DIR so repeated exports don't overwrite each other.
     custom_path = args[1] if len(args) > 1 else None
     if custom_path:
         filepath = custom_path if custom_path.endswith(f".{fmt}") else custom_path + f".{fmt}"
