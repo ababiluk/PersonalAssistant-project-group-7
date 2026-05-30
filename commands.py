@@ -21,11 +21,15 @@ from handlers.note_handlers import (
     add_note,
     edit_note,
     delete_note,
+    add_tag,
+)
+from handlers.note_display import (
     show_notes,
     show_all_notes,
-    find_notes,
     all_with_notes,
-    add_tag,
+)
+from handlers.note_search import (
+    find_notes,
     find_by_tag,
     sort_by_tags,
 )
